@@ -6,22 +6,22 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// Hand-drawn ANSI Shadow logo for "lfg".
+// Hand-drawn LFG logo built from pure full-block `█` glyphs.
 //
-// Why hand-drawn instead of go-figure: the bundled figlet fonts in
-// common-nighthawk/go-figure render `l f g` with disconnected verticals
-// (the brand reads as random pipes). A 6-row block-shaded glyph set
-// gives a clean, instantly-readable mark and lets us animate a gradient
-// sweep across columns without per-rune positioning quirks.
+// Why pure blocks: the previous ANSI-Shadow style mixed `█` with box-
+// drawing chars (`╗╔╚╝`), which render with visible gaps in many
+// monospace fonts (Ghostty, iTerm, etc.) — the letters fragmented into
+// disconnected pieces. Pure `█` rows render solid in every font and
+// gradient-color cleanly per column for the sweep animation.
 //
-// Each row is the same visible width so column-indexed coloring lines up.
+// Every row is right-padded to identical visible width so column-indexed
+// coloring lines up cleanly.
 var lfgLogo = []string{
-	`██╗     ███████╗ ██████╗ `,
-	`██║     ██╔════╝██╔════╝ `,
-	`██║     █████╗  ██║  ███╗`,
-	`██║     ██╔══╝  ██║   ██║`,
-	`███████╗██║     ╚██████╔╝`,
-	`╚══════╝╚═╝      ╚═════╝ `,
+	`██      ██████   █████ `,
+	`██      ██      ██     `,
+	`██      █████   ██ ███ `,
+	`██      ██      ██  ██ `,
+	`██████  ██       ████  `,
 }
 
 // Compact single-line gradient text for tiny terminals (height < 22).

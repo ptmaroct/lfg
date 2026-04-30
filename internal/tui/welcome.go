@@ -111,7 +111,7 @@ func (m welcomeModel) View(width, height int) string {
 	// Hero block — animated gradient logo on big terminals, single-line on small.
 	hero := RenderTitle(p, "lfg", compact, m.phase)
 	b.WriteString(lipgloss.PlaceHorizontal(contentW, lipgloss.Center, hero))
-	b.WriteString("\n")
+	b.WriteString("\n\n")
 	tagline := lipgloss.NewStyle().Foreground(p.Muted).Italic(true).
 		Render("a new dev machine, in less time than this hint takes to read")
 	b.WriteString(lipgloss.PlaceHorizontal(contentW, lipgloss.Center, tagline))
