@@ -29,7 +29,8 @@ type confirmModel struct {
 }
 
 func newConfirm(p Palette, bundles []preset.Bundle, selected map[string]bool) confirmModel {
-	m := confirmModel{palette: p, bySource: map[string]int{}}
+	// Default to "install" focused so users can hit Enter immediately.
+	m := confirmModel{palette: p, bySource: map[string]int{}, answer: true}
 	for _, b := range bundles {
 		for _, t := range b.Tools {
 			key := b.ID + "/" + t.Name

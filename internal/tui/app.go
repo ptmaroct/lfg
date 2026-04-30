@@ -94,6 +94,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.quitConfirm = newQuitConfirm(m.palette)
 			return m, m.quitConfirm.Init()
 		}
+		// Global `ctrl+t` → cycle theme (lfg → dracula → catppuccin → lfg).
+		// Use ctrl-prefixed so plain `t` stays available as filter input
+		// inside huh.MultiSelect-based pickers.
+		if msg.String() == "ctrl+t" {
+			m.theme = nextTheme(m.theme)
+			m.palette = PaletteFor(m.theme)
+			return m.rehydrate()
+		}
 	case transitionMsg:
 		return m.transition(msg)
 	case quitCancelMsg:
@@ -226,6 +234,55 @@ func (m Model) transition(msg transitionMsg) (tea.Model, tea.Cmd) {
 		return m, m.quitConfirm.Init()
 	case screenQuit:
 		return m, tea.Quit
+	}
+	return m, nil
+}
+
+// nextTheme cycles through the three built-in themes.
+func nextTheme(t ThemeName) ThemeName {
+	switch t {
+	case ThemeLFG:
+		return ThemeDracula
+	case ThemeDracula:
+		return ThemeCatppuccin
+	default:
+		return ThemeLFG
+	}
+}
+
+// rehydrate rebuilds the active child model with the current palette so
+// a live theme swap (`t` key) takes effect immediately. Selection state
+// flows through the root maps, so no data loss — only screen-local
+// cursor / animation phase resets.
+func (m Model) rehydrate() (tea.Model, tea.Cmd) {
+	switch m.screen {
+	case screenWelcome:
+		m.welcome = newWelcome(m.palette)
+		return m, m.welcome.Init()
+	case screenTree:
+		m.tree = newTreePicker(m.palette, m.bundles, m.selectedBundleIDs, m.selectedTools)
+		return m, m.tree.Init()
+	case screenBundles:
+		m.bundlePicker = newBundlePicker(m.palette, m.bundles, m.selectedBundleIDs)
+		return m, m.bundlePicker.Init()
+	case screenTools:
+		m.toolPicker = newToolPicker(m.palette, m.bundles, m.selectedBundleIDs, m.selectedTools)
+		return m, m.toolPicker.Init()
+	case screenConfirm:
+		m.confirm = newConfirm(m.palette, m.bundles, m.selectedTools)
+		return m, m.confirm.Init()
+	case screenProgress:
+		m.progress = newProgress(m.palette, m.bundles, m.selectedTools)
+		return m, m.progress.Init()
+	case screenDone:
+		m.done = newDone(m.palette)
+		return m, m.done.Init()
+	case screenBackupPrompt, screenBackupDone:
+		m.backup = newBackup(m.palette)
+		return m, m.backup.Init()
+	case screenQuitConfirm:
+		m.quitConfirm = newQuitConfirm(m.palette)
+		return m, m.quitConfirm.Init()
 	}
 	return m, nil
 }

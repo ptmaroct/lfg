@@ -133,6 +133,7 @@ func (m welcomeModel) View(width, height int) string {
 			KeyHint(p, "↑↓", "nav"),
 			KeyHint(p, "1-3", "jump"),
 			KeyHint(p, "⏎", "select"),
+			KeyHint(p, "^T", "theme"),
 			KeyHint(p, "Q", "quit"),
 		),
 		compact,
