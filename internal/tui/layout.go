@@ -7,95 +7,139 @@ import (
 )
 
 // Frame is the outer chrome applied to every screen.
-// Returns a fully rendered string sized to (width × height), centered.
 //
-//	 ╭────── ✨ lfg ✨ ──────╮
-//	 │                        │
-//	 │      [title art]       │
-//	 │     subtitle line      │
-//	 │                        │
-//	 │     inner content      │
-//	 │                        │
-//	 │    footer key hints    │
-//	 ╰────────────────────────╯
+// Aesthetic: tactical bulletin. Heavy ━ rules at top + bottom strips,
+// hairline ─ rules within content. Content is left-padded; no centered
+// rounded card. Header strip = brand mark + breadcrumb. Footer strip =
+// key cells. The whole frame is then placed via lipgloss.Place so it
+// sits centered in any terminal size.
 //
-// Width of the inner panel is min(term_width-4, 90). Height is term_height.
+// Inner widgets render their own internal hairline rules / tables;
+// Frame only owns the outer two strips.
 func Frame(p Palette, width, height int, subtitle, inner, footer string, compactTitle bool) string {
 	canvasW := width - 4
-	if canvasW > 90 {
-		canvasW = 90
+	if canvasW > 100 {
+		canvasW = 100
 	}
-	if canvasW < 40 {
-		canvasW = 40
+	if canvasW < 56 {
+		canvasW = 56
 	}
 
-	title := RenderTitle(p, "lfg", compactTitle)
+	// Header strip: small brand mark + dot separator + crumb left, theme
+	// breadcrumb right. No big figlet hero — that's only on welcome
+	// (renderHero), called separately.
+	brand := lipgloss.NewStyle().Foreground(p.Primary).Bold(true).Render("▌ lfg")
+	dot := lipgloss.NewStyle().Foreground(p.Subtle).Render(" │ ")
+	crumb := lipgloss.NewStyle().Foreground(p.Text).Render(strings.ToUpper(subtitle))
+	leftStrip := brand + dot + crumb
 
-	subtitleStyle := lipgloss.NewStyle().
-		Foreground(p.Muted).
-		Italic(true).
-		Align(lipgloss.Center).
-		Width(canvasW - 4)
+	heavy := lipgloss.NewStyle().Foreground(p.Subtle).Render(strings.Repeat("━", canvasW))
 
-	footerStyle := lipgloss.NewStyle().
-		Foreground(p.Muted).
-		Align(lipgloss.Center).
-		Width(canvasW - 4).
-		MarginTop(1)
+	// Right-side breadcrumb empty for now; could carry "v0.1" or theme name.
+	rightStrip := ""
+	header := joinStrip(canvasW, leftStrip, rightStrip)
 
-	// PlaceHorizontal treats input as one atomic block — preserves figlet
-	// art alignment. Per-line Align(Center) would drift uneven-width lines.
-	titleBlock := lipgloss.PlaceHorizontal(canvasW-4, lipgloss.Center, title)
+	// Footer strip: heavy rule + key cells.
+	footerLine := footer
 
-	// Wrap inner widget (huh form, summary panels, etc.) in a card so its
-	// rectangle has clear edges and can be centered as one unit. Without the
-	// card the form's lines were flush-left within their centered bounding
-	// box, looking off-center even though they technically were centered.
-	cardW := canvasW - 12
-	if cardW < 40 {
-		cardW = 40
-	}
-	card := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(p.Subtle).
-		Padding(1, 3).
-		Width(cardW).
-		Render(strings.TrimRight(inner, "\n"))
-	innerBlock := lipgloss.PlaceHorizontal(canvasW-4, lipgloss.Center, card)
+	// Pad inner content with 2-char left margin so headings line up with
+	// the strip's brand mark.
+	innerPadded := indent(inner, 0)
 
-	sections := []string{titleBlock}
-	if subtitle != "" {
-		sections = append(sections, subtitleStyle.Render(subtitle))
-	}
-	sections = append(sections, "")
-	sections = append(sections, innerBlock)
-	if footer != "" {
-		sections = append(sections, footerStyle.Render(footer))
-	}
-	body := lipgloss.JoinVertical(lipgloss.Center, sections...)
+	body := strings.Join([]string{
+		heavy,
+		header,
+		heavy,
+		"",
+		innerPadded,
+		"",
+		heavy,
+		footerLine,
+		heavy,
+	}, "\n")
 
-	box := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(p.Accent).
-		Padding(1, 2).
-		Width(canvasW).
-		Render(body)
+	// Pad every body line to canvasW. lipgloss.Place centers each line
+	// individually using its own width — without uniform-width lines,
+	// short lines (action rows, footer) get re-centered separately and
+	// drift away from the heavy rules. Right-padding flattens the block
+	// into a true rectangle so Place treats it as one unit.
+	body = padLinesTo(body, canvasW)
 
 	if width <= 0 || height <= 0 {
-		return box
+		return body
 	}
-	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, box)
+	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, body)
 }
 
-// KeyHint renders a single `key · label` pair used in the footer.
+// padLinesTo right-pads every line in s to width visible columns.
+func padLinesTo(s string, width int) string {
+	lines := strings.Split(s, "\n")
+	for i, ln := range lines {
+		w := lipgloss.Width(ln)
+		if w < width {
+			lines[i] = ln + strings.Repeat(" ", width-w)
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+// joinStrip returns "  left....right  " padded to width.
+func joinStrip(width int, left, right string) string {
+	leftW := lipgloss.Width(left)
+	rightW := lipgloss.Width(right)
+	pad := width - leftW - rightW - 4
+	if pad < 1 {
+		pad = 1
+	}
+	return "  " + left + strings.Repeat(" ", pad) + right + "  "
+}
+
+// indent prepends `n` spaces to every line. Currently unused but kept for
+// future per-screen offset needs (e.g. table indents).
+func indent(s string, n int) string {
+	if n <= 0 {
+		return s
+	}
+	pad := strings.Repeat(" ", n)
+	out := make([]string, 0)
+	for _, ln := range strings.Split(s, "\n") {
+		out = append(out, pad+ln)
+	}
+	return strings.Join(out, "\n")
+}
+
+// Hairline rule of given width.
+func Hairline(p Palette, width int) string {
+	return lipgloss.NewStyle().Foreground(p.Hairline).Render(strings.Repeat("─", width))
+}
+
+// SectionLabel renders an uppercase tracking-tight section header.
+//
+//	┃ BUNDLES                                              4 ITEMS
+func SectionLabel(p Palette, label, suffix string, width int) string {
+	bar := lipgloss.NewStyle().Foreground(p.Primary).Render("┃ ")
+	main := lipgloss.NewStyle().Foreground(p.Text).Bold(true).Render(strings.ToUpper(label))
+	suf := lipgloss.NewStyle().Foreground(p.Muted).Render(strings.ToUpper(suffix))
+	mainW := lipgloss.Width(bar) + lipgloss.Width(main)
+	sufW := lipgloss.Width(suf)
+	pad := width - mainW - sufW
+	if pad < 1 {
+		pad = 1
+	}
+	return bar + main + strings.Repeat(" ", pad) + suf
+}
+
+// KeyHint renders a single `[KEY] LABEL` cell used in the footer.
+// Bracket + uppercase reads as instrument-panel button.
 func KeyHint(p Palette, key, label string) string {
-	k := lipgloss.NewStyle().Foreground(p.Primary).Bold(true).Render(key)
-	d := lipgloss.NewStyle().Foreground(p.Muted).Render(" " + label)
-	return k + d
+	keyStyle := lipgloss.NewStyle().Foreground(p.Primary).Bold(true)
+	bracket := lipgloss.NewStyle().Foreground(p.Subtle).Render
+	labelStyle := lipgloss.NewStyle().Foreground(p.Muted)
+	return bracket("[") + keyStyle.Render(key) + bracket("] ") + labelStyle.Render(strings.ToUpper(label))
 }
 
-// HintLine joins multiple hints with a middle-dot separator.
+// HintLine joins multiple hints, left-padded to align with header.
 func HintLine(p Palette, hints ...string) string {
-	sep := lipgloss.NewStyle().Foreground(p.Subtle).Render(" · ")
-	return strings.Join(hints, sep)
+	sep := lipgloss.NewStyle().Foreground(p.Subtle).Render("  ")
+	return "  " + strings.Join(hints, sep)
 }

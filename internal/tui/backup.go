@@ -1,20 +1,20 @@
 package tui
 
 import (
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 )
 
-// backupModel — encrypt y/n → fake pack → result card.
+// backupModel — encrypt y/n prompt → fake pack → result card.
 type backupModel struct {
 	palette  Palette
 	step     int // 0=prompt, 1=running, 2=done
 	encrypt  bool
-	form     *huh.Form
+	cursor   int // 0=encrypt, 1=plain
 	spinner  spinner.Model
 	filepath string
 }
@@ -22,39 +22,47 @@ type backupModel struct {
 type backupDoneMsg struct{}
 
 func newBackup(p Palette) backupModel {
-	m := backupModel{palette: p}
-	m.form = huh.NewForm(
-		huh.NewGroup(
-			huh.NewConfirm().
-				Title("Encrypt this backup?").
-				Description("Encrypted (.tar.age) needs ~/.config/lfg/key.txt to restore. Safer for dotfiles + env vars.").
-				Affirmative("Encrypt").
-				Negative("Plain tar").
-				Value(&m.encrypt),
-		),
-	).
-		WithTheme(HuhTheme(p)).
-		WithShowHelp(false)
-
 	sp := spinner.New()
 	sp.Spinner = spinner.Dot
 	sp.Style = lipgloss.NewStyle().Foreground(p.Primary)
-	m.spinner = sp
-	return m
+	return backupModel{palette: p, spinner: sp}
 }
 
-func (m backupModel) Init() tea.Cmd {
-	return tea.Batch(m.form.Init(), m.spinner.Tick)
-}
+func (m backupModel) Init() tea.Cmd { return m.spinner.Tick }
 
 func (m backupModel) Update(msg tea.Msg) (backupModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		if m.step == 2 {
+		switch m.step {
+		case 0:
+			switch msg.String() {
+			case "left", "h", "right", "l", "tab":
+				m.cursor = 1 - m.cursor
+			case "enter":
+				m.encrypt = m.cursor == 0
+				m.step = 1
+				return m, tea.Tick(1200*time.Millisecond, func(time.Time) tea.Msg {
+					return backupDoneMsg{}
+				})
+			case "y", "Y":
+				m.encrypt = true
+				m.cursor = 0
+				m.step = 1
+				return m, tea.Tick(1200*time.Millisecond, func(time.Time) tea.Msg {
+					return backupDoneMsg{}
+				})
+			case "n", "N":
+				m.encrypt = false
+				m.cursor = 1
+				m.step = 1
+				return m, tea.Tick(1200*time.Millisecond, func(time.Time) tea.Msg {
+					return backupDoneMsg{}
+				})
+			case "esc":
+				return m, goTo(screenWelcome)
+			}
+		case 2:
 			return m, tea.Quit
-		}
-		if msg.String() == "esc" && m.step == 0 {
-			return m, goTo(screenWelcome)
 		}
 	case spinner.TickMsg:
 		var cmd tea.Cmd
@@ -68,70 +76,83 @@ func (m backupModel) Update(msg tea.Msg) (backupModel, tea.Cmd) {
 			m.filepath = "~/lfg-backup-" + ts + ".tar.gz"
 		}
 		m.step = 2
-		return m, nil
-	}
-
-	if m.step == 0 {
-		f, cmd := m.form.Update(msg)
-		if ff, ok := f.(*huh.Form); ok {
-			m.form = ff
-		}
-		if m.form.State == huh.StateCompleted {
-			m.step = 1
-			return m, tea.Tick(1200*time.Millisecond, func(time.Time) tea.Msg {
-				return backupDoneMsg{}
-			})
-		}
-		return m, cmd
 	}
 	return m, nil
 }
 
 func (m backupModel) View(width, height int) string {
 	p := m.palette
-	var inner string
+	canvasW := width - 4
+	if canvasW > 100 {
+		canvasW = 100
+	}
+	if canvasW < 56 {
+		canvasW = 56
+	}
+	contentW := canvasW - 4
+
+	var b strings.Builder
 
 	switch m.step {
 	case 0:
-		inner = m.form.View()
+		b.WriteString(SectionLabel(p, "Encrypt the backup?", "", contentW))
+		b.WriteString("\n\n")
+
+		opts := []struct{ label, desc string }{
+			{"YES   .tar.age", "Encrypted via age. Need ~/.config/lfg/key.txt to restore. Safer for dotfiles + env."},
+			{"NO    .tar.gz", "Plain tar.gz. Inspectable. DO NOT include secrets."},
+		}
+		for i, o := range opts {
+			num := lipgloss.NewStyle().Foreground(p.Muted).Render("0" + sprint1(i+1))
+			gutter := "  "
+			labelStyle := lipgloss.NewStyle().Foreground(p.Text).Bold(true)
+			descStyle := lipgloss.NewStyle().Foreground(p.Muted).Italic(true)
+			if i == m.cursor {
+				gutter = lipgloss.NewStyle().Foreground(p.Primary).Bold(true).Render("▸ ")
+				num = lipgloss.NewStyle().Foreground(p.Primary).Bold(true).Render("0" + sprint1(i+1))
+				labelStyle = labelStyle.Foreground(p.Primary)
+			}
+			b.WriteString(gutter + num + "  " + labelStyle.Render(o.label) + "\n")
+			b.WriteString("       " + descStyle.Render(o.desc) + "\n\n")
+		}
 	case 1:
+		b.WriteString(SectionLabel(p, "Packing", "", contentW))
+		b.WriteString("\n\n")
 		label := lipgloss.NewStyle().Foreground(p.Text).Render("packing your machine...")
 		sub := lipgloss.NewStyle().Foreground(p.Muted).Italic(true).Render("dotfiles · brew list · configs")
-		inner = lipgloss.JoinVertical(lipgloss.Center,
-			m.spinner.View()+"  "+label,
-			"",
-			sub,
-		)
+		b.WriteString("  " + m.spinner.View() + "  " + label + "\n\n")
+		b.WriteString("  " + sub)
 	case 2:
-		check := lipgloss.NewStyle().Foreground(p.Success).Bold(true).Render("✓")
-		title := lipgloss.NewStyle().Foreground(p.Text).Bold(true).Render("backup written")
+		b.WriteString(SectionLabel(p, "Backup written", "", contentW))
+		b.WriteString("\n\n")
+		check := lipgloss.NewStyle().Foreground(p.Success).Bold(true).Render("●")
 		path := lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(p.Accent).
 			Foreground(p.Primary).
 			Bold(true).
+			Border(lipgloss.NormalBorder()).
+			BorderForeground(p.Subtle).
 			Padding(0, 2).
 			Render(m.filepath)
-		parts := []string{
-			check + "  " + title,
-			"",
-			path,
-		}
+		b.WriteString("  " + check + "  saved\n\n")
+		b.WriteString("  " + path + "\n")
 		if m.encrypt {
-			warn := lipgloss.NewStyle().Foreground(p.Warn).Bold(true).Render("⚠  back up ~/.config/lfg/key.txt separately")
-			note := lipgloss.NewStyle().Foreground(p.Muted).Italic(true).Render("without it, this archive is unrecoverable")
-			parts = append(parts, "", warn, note)
+			b.WriteString("\n")
+			warn := lipgloss.NewStyle().Foreground(p.Warn).Bold(true).Render("⚠ ")
+			note := lipgloss.NewStyle().Foreground(p.Muted).Italic(true).
+				Render("back up ~/.config/lfg/key.txt separately — without it, archive is unrecoverable")
+			b.WriteString("  " + warn + note)
 		}
-		inner = lipgloss.JoinVertical(lipgloss.Center, parts...)
 	}
 
 	hint := HintLine(p,
-		KeyHint(p, "enter", "confirm"),
-		KeyHint(p, "esc", "back"),
+		KeyHint(p, "←→", "switch"),
+		KeyHint(p, "Y/N", "pick"),
+		KeyHint(p, "⏎", "confirm"),
+		KeyHint(p, "⎋", "back"),
 	)
 	if m.step == 2 {
-		hint = HintLine(p, KeyHint(p, "any key", "exit"))
+		hint = HintLine(p, KeyHint(p, "any", "exit"))
 	}
 
-	return Frame(p, width, height, "backup", inner, hint, height < 22)
+	return Frame(p, width, height, "backup", b.String(), hint, height < 22)
 }

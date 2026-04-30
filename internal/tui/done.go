@@ -1,11 +1,13 @@
 package tui
 
 import (
+	"strings"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
-// doneModel — final card.
+// doneModel — final celebration card. Big checkmark, headline, next-step list.
 type doneModel struct {
 	palette Palette
 }
@@ -23,40 +25,48 @@ func (m doneModel) Update(msg tea.Msg) (doneModel, tea.Cmd) {
 
 func (m doneModel) View(width, height int) string {
 	p := m.palette
-	big := lipgloss.NewStyle().Foreground(p.Success).Bold(true).Render("✓")
-	headline := lipgloss.NewStyle().Foreground(p.Text).Bold(true).Render("Welcome home.")
-	sub := lipgloss.NewStyle().Foreground(p.Muted).Italic(true).Render("Your machine feels a little more like yours.")
-
-	step := func(cmd, label string) string {
-		c := lipgloss.NewStyle().Foreground(p.Primary).Bold(true).Render(cmd)
-		l := lipgloss.NewStyle().Foreground(p.Muted).Render(" " + label)
-		return c + l
+	canvasW := width - 4
+	if canvasW > 100 {
+		canvasW = 100
 	}
+	if canvasW < 56 {
+		canvasW = 56
+	}
+	contentW := canvasW - 4
 
-	nextBox := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(p.Subtle).
-		Padding(1, 2).
-		Width(48).
-		Render(lipgloss.JoinVertical(lipgloss.Left,
-			lipgloss.NewStyle().Foreground(p.Text).Bold(true).Render("next steps"),
-			"",
-			step("exec zsh", "reload your shell"),
-			step("lfg backup", "snapshot this machine to a file"),
-			step("lfg", "re-run anytime"),
-		))
+	var b strings.Builder
 
-	inner := lipgloss.JoinVertical(lipgloss.Center,
-		lipgloss.NewStyle().Foreground(p.Success).Bold(true).Padding(0, 2).Render(big+" "+headline),
-		sub,
-		"",
-		nextBox,
-	)
+	// Big check + headline
+	check := lipgloss.NewStyle().Foreground(p.Success).Bold(true).Render("●")
+	headline := lipgloss.NewStyle().Foreground(p.Text).Bold(true).Render("WELCOME HOME")
+	row := lipgloss.JoinHorizontal(lipgloss.Bottom, check, "  ", headline)
+	b.WriteString(lipgloss.PlaceHorizontal(contentW, lipgloss.Center, row))
+	b.WriteString("\n")
+	tagline := lipgloss.NewStyle().Foreground(p.Muted).Italic(true).
+		Render("your machine feels a little more like yours")
+	b.WriteString(lipgloss.PlaceHorizontal(contentW, lipgloss.Center, tagline))
+	b.WriteString("\n\n")
+
+	// Next steps
+	b.WriteString(SectionLabel(p, "Next steps", "", contentW))
+	b.WriteString("\n\n")
+
+	steps := []struct{ cmd, desc string }{
+		{"exec zsh", "reload your shell"},
+		{"lfg backup", "snapshot this machine"},
+		{"lfg", "re-run anytime"},
+	}
+	for i, s := range steps {
+		num := lipgloss.NewStyle().Foreground(p.Muted).Render(strings.Repeat("0", 1) + sprint1(i+1))
+		cmd := lipgloss.NewStyle().Foreground(p.Primary).Bold(true).Render(s.cmd)
+		desc := lipgloss.NewStyle().Foreground(p.Muted).Render(" · " + s.desc)
+		b.WriteString("  " + num + "  " + cmd + desc + "\n")
+	}
 
 	return Frame(p, width, height,
 		"all set",
-		inner,
-		HintLine(p, KeyHint(p, "any key", "exit")),
+		b.String(),
+		HintLine(p, KeyHint(p, "any", "exit")),
 		height < 22,
 	)
 }

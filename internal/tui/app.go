@@ -12,6 +12,7 @@ type screen int
 
 const (
 	screenWelcome screen = iota
+	screenTree // unified bundle + tool picker (tree view)
 	screenBundles
 	screenTools
 	screenConfirm
@@ -33,6 +34,7 @@ type Model struct {
 	bundles []preset.Bundle
 
 	welcome      welcomeModel
+	tree         treePickerModel
 	bundlePicker bundlePickerModel
 	toolPicker   toolPickerModel
 	confirm      confirmModel
@@ -90,6 +92,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch m.screen {
 	case screenWelcome:
 		m.welcome, cmd = m.welcome.Update(msg)
+	case screenTree:
+		m.tree, cmd = m.tree.Update(msg)
 	case screenBundles:
 		m.bundlePicker, cmd = m.bundlePicker.Update(msg)
 	case screenTools:
@@ -111,6 +115,8 @@ func (m Model) forwardSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	switch m.screen {
 	case screenWelcome:
 		m.welcome, cmd = m.welcome.Update(msg)
+	case screenTree:
+		m.tree, cmd = m.tree.Update(msg)
 	case screenBundles:
 		m.bundlePicker, cmd = m.bundlePicker.Update(msg)
 	case screenTools:
@@ -131,6 +137,8 @@ func (m Model) View() string {
 	switch m.screen {
 	case screenWelcome:
 		return m.welcome.View(m.width, m.height)
+	case screenTree:
+		return m.tree.View(m.width, m.height)
 	case screenBundles:
 		return m.bundlePicker.View(m.width, m.height)
 	case screenTools:
@@ -169,6 +177,9 @@ func (m Model) transition(msg transitionMsg) (tea.Model, tea.Cmd) {
 	case screenWelcome:
 		m.welcome = newWelcome(m.palette)
 		return m, m.welcome.Init()
+	case screenTree:
+		m.tree = newTreePicker(m.palette, m.bundles, m.selectedBundleIDs, m.selectedTools)
+		return m, m.tree.Init()
 	case screenBundles:
 		m.bundlePicker = newBundlePicker(m.palette, m.bundles, m.selectedBundleIDs)
 		return m, m.bundlePicker.Init()

@@ -16,6 +16,11 @@ const (
 
 // Palette is the set of colors each screen pulls from.
 // Every theme exposes the same keys so screens don't branch on ThemeName.
+//
+// Aesthetic guidance: 95% surfaces use Text + Muted + Subtle. Primary is
+// the SHARP accent — cursor, headers, key glyphs, divider rules. Avoid
+// scattering Primary into body content; it loses signal value.
+// Gradient is reserved for the title hero block on welcome only.
 type Palette struct {
 	Bg       lipgloss.Color
 	Panel    lipgloss.Color
@@ -27,7 +32,8 @@ type Palette struct {
 	Muted    lipgloss.Color
 	Text     lipgloss.Color
 	Subtle   lipgloss.Color
-	Gradient []lipgloss.Color // stops used for title + border blends
+	Hairline lipgloss.Color   // thin rule color (between Subtle and Muted)
+	Gradient []lipgloss.Color // stops used for title hero blend only
 }
 
 // PaletteFor returns the palette for a theme name, with lfg as default.
@@ -35,51 +41,48 @@ func PaletteFor(name ThemeName) Palette {
 	switch name {
 	case ThemeDracula:
 		return Palette{
-			Bg:      "#282A36",
-			Panel:   "#1E1F29",
-			Primary: "#FF79C6", // pink
-			Accent:  "#BD93F9", // purple
-			Success: "#50FA7B", // green
-			Warn:    "#F1FA8C",
-			Error:   "#FF5555",
-			Muted:   "#6272A4",
-			Text:    "#F8F8F2",
-			Subtle:  "#44475A",
-			Gradient: []lipgloss.Color{
-				"#FF79C6", "#BD93F9", "#8BE9FD", "#50FA7B",
-			},
+			Bg:       "#282A36",
+			Panel:    "#1E1F29",
+			Primary:  "#FF79C6",
+			Accent:   "#BD93F9",
+			Success:  "#50FA7B",
+			Warn:     "#F1FA8C",
+			Error:    "#FF5555",
+			Muted:    "#6272A4",
+			Text:     "#F8F8F2",
+			Subtle:   "#44475A",
+			Hairline: "#3D3F4F",
+			Gradient: []lipgloss.Color{"#FF79C6", "#BD93F9", "#8BE9FD", "#50FA7B"},
 		}
 	case ThemeCatppuccin:
 		return Palette{
-			Bg:      "#1E1E2E",
-			Panel:   "#181825",
-			Primary: "#F5C2E7", // pink (Mocha)
-			Accent:  "#CBA6F7", // mauve
-			Success: "#A6E3A1", // green
-			Warn:    "#F9E2AF",
-			Error:   "#F38BA8",
-			Muted:   "#6C7086",
-			Text:    "#CDD6F4",
-			Subtle:  "#313244",
-			Gradient: []lipgloss.Color{
-				"#F5C2E7", "#CBA6F7", "#89B4FA", "#A6E3A1",
-			},
+			Bg:       "#1E1E2E",
+			Panel:    "#181825",
+			Primary:  "#F5C2E7",
+			Accent:   "#CBA6F7",
+			Success:  "#A6E3A1",
+			Warn:     "#F9E2AF",
+			Error:    "#F38BA8",
+			Muted:    "#6C7086",
+			Text:     "#CDD6F4",
+			Subtle:   "#313244",
+			Hairline: "#2A2B3D",
+			Gradient: []lipgloss.Color{"#F5C2E7", "#CBA6F7", "#89B4FA", "#A6E3A1"},
 		}
 	default: // ThemeLFG
 		return Palette{
-			Bg:      "#0A0A0F",
-			Panel:   "#14141F",
-			Primary: "#FF5FD9", // hot pink
-			Accent:  "#7D56F4", // charm purple
-			Success: "#04E5AE", // mint
-			Warn:    "#FFBB33",
-			Error:   "#FF5555",
-			Muted:   "#626262",
-			Text:    "#F0F0F5",
-			Subtle:  "#2A2A3A",
-			Gradient: []lipgloss.Color{
-				"#FF5FD9", "#B37CFF", "#7D56F4", "#04E5AE",
-			},
+			Bg:       "#0A0A0F",
+			Panel:    "#14141F",
+			Primary:  "#FF5FD9",
+			Accent:   "#7D56F4",
+			Success:  "#04E5AE",
+			Warn:     "#FFBB33",
+			Error:    "#FF5555",
+			Muted:    "#7A7A85",
+			Text:     "#F0F0F5",
+			Subtle:   "#2A2A3A",
+			Hairline: "#1F1F2E",
+			Gradient: []lipgloss.Color{"#FF5FD9", "#B37CFF", "#7D56F4", "#04E5AE"},
 		}
 	}
 }

@@ -1,20 +1,20 @@
- ╭────────────────────────────────────────────────────────╮ 
- │                                                        │ 
- │                          LFG                           │ 
- │               bootstrap your dev machine               │ 
- │                                                        │ 
- │     ╭────────────────────────────────────────────╮     │ 
- │     │                                            │     │ 
- │     │   What would you like to do?               │     │ 
- │     │   Fresh machine detected. Pick your        │     │ 
- │     │   path.                                    │     │ 
- │     │   > Install recommended setup              │     │ 
- │     │     Backup this machine to a file          │     │ 
- │     │     Quit                                   │     │ 
- │     │                                            │     │ 
- │     ╰────────────────────────────────────────────╯     │ 
- │                                                        │ 
- │         ↑/↓ move · enter select · ctrl-c quit          │ 
- │                                                        │ 
- ╰────────────────────────────────────────────────────────╯ 
-                                                            
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ▌ lfg │ STEP 1/2 · PICK TOOLS                         
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                        
+┃ PICK WHAT TO INSTALL                    7 SELECTED    
+  Tabular bundles + tools. → expand · ← collapse · space toggle
+                                                        
+  ID    BUNDLE / TOOL             STATE         COUNT   
+  ──────────────────────────────────────────────────    
+▸ 01 ▶  DEFAULT                   ◐ 7/22        22 tools
+  02 ▶  MAC-POWER-USER            ○ 0/9         9 tools 
+  03 ▶  AI-CLIS                   ○ 0/6         6 tools 
+  04 ▶  MEDIA                     ○ 0/5         5 tools 
+  ──────────────────────────────────────────────────    
+                                                        
+                                                        
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  [↑↓] NAV  [→←] TREE  [SP] TOGGLE  [A] ALL  [⏎] NEXT  [⎋] BACK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                                               

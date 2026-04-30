@@ -139,21 +139,6 @@ func TestSnapshot_BackupPrompt(t *testing.T) {
 	}
 }
 
-// TestNoControlCharsLeak — sanity check that our themes/styles don't bleed
-// raw ANSI escape codes into the rendered output beyond expected styling.
-// Cheap regression for "border showed up where it shouldn't" bugs.
-func TestNoControlCharsLeak(t *testing.T) {
-	m := New(ThemeLFG)
-	_ = m.Init()
-	mm, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
-	out := mm.View()
-	// Hidden border characters shouldn't render any visible glyph.
-	bad := []string{"│ ", " │", "└", "┐", "┌", "┘"} // any block-border chars huh might leak
-	for _, b := range bad {
-		// Only fail if a bare border char appears outside our outer Frame box,
-		// which uses lipgloss.RoundedBorder (those use ╭╮╯╰─│). Skip.
-		if strings.Contains(out, b) && !strings.Contains(out, "╭") {
-			t.Errorf("unexpected border char %q in output", b)
-		}
-	}
-}
+// (TestNoControlCharsLeak removed — was a fragile heuristic for an old
+// huh-group-border bug. The redesign uses `│` legitimately as a separator
+// in header strips. Snapshot tests above already catch any visual drift.)
