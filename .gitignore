@@ -1,0 +1,28 @@
+# build output
+/lfg
+/lfg-linux
+/lfg-darwin
+
+# snapshot scratch
+/snaps/
+/demos/*.gif
+/demos/*.mp4
+/demos/*.webm
+
+# docker test home (created by `docker run -v ./.docker-home:/root`)
+/.docker-home/
+
+# misc
+*.log
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# planning + agent artifacts
+plan.md
+chrome-tabs.md
+.agents/
+.claude/
+skills-lock.json

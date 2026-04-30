@@ -1,0 +1,210 @@
+// Package tui wires the screen state machine for `lfg`.
+package tui
+
+import (
+	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/anuj/lfg/internal/preset"
+)
+
+// screen is the high-level TUI state enum.
+type screen int
+
+const (
+	screenWelcome screen = iota
+	screenBundles
+	screenTools
+	screenConfirm
+	screenProgress
+	screenDone
+	screenBackupPrompt
+	screenBackupDone
+	screenQuit
+)
+
+// Model is the root bubbletea model. Each screen is a child model;
+// Update dispatches based on current `screen`.
+type Model struct {
+	screen  screen
+	width   int
+	height  int
+	palette Palette
+	theme   ThemeName
+	bundles []preset.Bundle
+
+	welcome      welcomeModel
+	bundlePicker bundlePickerModel
+	toolPicker   toolPickerModel
+	confirm      confirmModel
+	progress     progressModel
+	done         doneModel
+	backup       backupModel
+
+	selectedBundleIDs map[string]bool
+	selectedTools     map[string]bool // key = bundleID + "/" + toolName
+}
+
+// New builds the root model with the given theme.
+func New(theme ThemeName) Model {
+	p := PaletteFor(theme)
+	bs := preset.All()
+	pre := map[string]bool{}
+	for _, bundle := range bs {
+		if bundle.Default {
+			pre[bundle.ID] = true
+		}
+	}
+	m := Model{
+		screen:            screenWelcome,
+		palette:           p,
+		theme:             theme,
+		bundles:           bs,
+		selectedBundleIDs: pre,
+		selectedTools:     map[string]bool{},
+	}
+	m.welcome = newWelcome(p)
+	return m
+}
+
+func (m Model) Init() tea.Cmd {
+	return m.welcome.Init()
+}
+
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		// Forward size to active screen so inner widgets resize.
+		return m.forwardSize(msg)
+	case tea.KeyMsg:
+		if msg.String() == "ctrl+c" {
+			m.screen = screenQuit
+			return m, tea.Quit
+		}
+	case transitionMsg:
+		return m.transition(msg)
+	}
+
+	var cmd tea.Cmd
+	switch m.screen {
+	case screenWelcome:
+		m.welcome, cmd = m.welcome.Update(msg)
+	case screenBundles:
+		m.bundlePicker, cmd = m.bundlePicker.Update(msg)
+	case screenTools:
+		m.toolPicker, cmd = m.toolPicker.Update(msg)
+	case screenConfirm:
+		m.confirm, cmd = m.confirm.Update(msg)
+	case screenProgress:
+		m.progress, cmd = m.progress.Update(msg)
+	case screenDone:
+		m.done, cmd = m.done.Update(msg)
+	case screenBackupPrompt, screenBackupDone:
+		m.backup, cmd = m.backup.Update(msg)
+	}
+	return m, cmd
+}
+
+func (m Model) forwardSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	switch m.screen {
+	case screenWelcome:
+		m.welcome, cmd = m.welcome.Update(msg)
+	case screenBundles:
+		m.bundlePicker, cmd = m.bundlePicker.Update(msg)
+	case screenTools:
+		m.toolPicker, cmd = m.toolPicker.Update(msg)
+	case screenConfirm:
+		m.confirm, cmd = m.confirm.Update(msg)
+	case screenProgress:
+		m.progress, cmd = m.progress.Update(msg)
+	case screenDone:
+		m.done, cmd = m.done.Update(msg)
+	case screenBackupPrompt, screenBackupDone:
+		m.backup, cmd = m.backup.Update(msg)
+	}
+	return m, cmd
+}
+
+func (m Model) View() string {
+	switch m.screen {
+	case screenWelcome:
+		return m.welcome.View(m.width, m.height)
+	case screenBundles:
+		return m.bundlePicker.View(m.width, m.height)
+	case screenTools:
+		return m.toolPicker.View(m.width, m.height)
+	case screenConfirm:
+		return m.confirm.View(m.width, m.height)
+	case screenProgress:
+		return m.progress.View(m.width, m.height)
+	case screenDone:
+		return m.done.View(m.width, m.height)
+	case screenBackupPrompt, screenBackupDone:
+		return m.backup.View(m.width, m.height)
+	case screenQuit:
+		return ""
+	}
+	return ""
+}
+
+// transitionMsg requests a screen change, optionally carrying state.
+type transitionMsg struct {
+	target            screen
+	selectedBundleIDs map[string]bool
+	selectedTools     map[string]bool
+}
+
+func (m Model) transition(msg transitionMsg) (tea.Model, tea.Cmd) {
+	if msg.selectedBundleIDs != nil {
+		m.selectedBundleIDs = msg.selectedBundleIDs
+	}
+	if msg.selectedTools != nil {
+		m.selectedTools = msg.selectedTools
+	}
+	m.screen = msg.target
+
+	switch msg.target {
+	case screenWelcome:
+		m.welcome = newWelcome(m.palette)
+		return m, m.welcome.Init()
+	case screenBundles:
+		m.bundlePicker = newBundlePicker(m.palette, m.bundles, m.selectedBundleIDs)
+		return m, m.bundlePicker.Init()
+	case screenTools:
+		m.toolPicker = newToolPicker(m.palette, m.bundles, m.selectedBundleIDs, m.selectedTools)
+		return m, m.toolPicker.Init()
+	case screenConfirm:
+		m.confirm = newConfirm(m.palette, m.bundles, m.selectedTools)
+		return m, m.confirm.Init()
+	case screenProgress:
+		m.progress = newProgress(m.palette, m.bundles, m.selectedTools)
+		return m, m.progress.Init()
+	case screenDone:
+		m.done = newDone(m.palette)
+		return m, m.done.Init()
+	case screenBackupPrompt:
+		m.backup = newBackup(m.palette)
+		return m, m.backup.Init()
+	case screenQuit:
+		return m, tea.Quit
+	}
+	return m, nil
+}
+
+func goTo(target screen) tea.Cmd {
+	return func() tea.Msg { return transitionMsg{target: target} }
+}
+
+func goToWithBundles(target screen, bundleIDs map[string]bool) tea.Cmd {
+	return func() tea.Msg {
+		return transitionMsg{target: target, selectedBundleIDs: bundleIDs}
+	}
+}
+
+func goToWithTools(target screen, tools map[string]bool) tea.Cmd {
+	return func() tea.Msg {
+		return transitionMsg{target: target, selectedTools: tools}
+	}
+}
