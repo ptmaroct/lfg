@@ -112,32 +112,33 @@ func All() []Bundle {
 		},
 		{
 			// AI CLIs — three picks (codex, claude code, opencode).
-			// Install commands verified via perplexity against official docs.
+			// All installed via npm globally for cross-platform consistency.
+			// Requires Node.js (≥18 for claude-code, ≥22 recommended for codex).
 			ID:          "ai-clis",
 			Name:        "ai-clis",
-			Description: "codex, claude-code, opencode",
+			Description: "codex, claude-code, opencode (npm)",
 			Tools: []Tool{
 				{
-					Name: "codex", Source: "cask",
-					Description: "OpenAI Codex CLI",
+					Name: "codex", Source: "npm",
+					Description: "OpenAI Codex CLI (@openai/codex)",
 					Installed:   true, Version: "0.14.0",
-					InstallMac:   "brew install --cask codex",
+					InstallMac:   "npm install -g @openai/codex",
 					InstallLinux: "npm install -g @openai/codex",
 					Binary:       "codex",
 				},
 				{
-					Name: "claude-code", Source: "cask",
-					Description: "Anthropic Claude Code CLI",
+					Name: "claude-code", Source: "npm",
+					Description: "Anthropic Claude Code CLI (@anthropic-ai/claude-code)",
 					Installed:   true, Version: "2.1.123",
-					InstallMac:   "brew install --cask claude-code",
-					InstallLinux: "curl -fsSL https://claude.ai/install.sh | bash",
+					InstallMac:   "npm install -g @anthropic-ai/claude-code",
+					InstallLinux: "npm install -g @anthropic-ai/claude-code",
 					Binary:       "claude",
 				},
 				{
-					Name: "opencode", Source: "brew",
-					Description: "Open-source TUI coding agent (sst)",
-					InstallMac:   "brew install anomalyco/tap/opencode",
-					InstallLinux: "curl -fsSL https://opencode.ai/install | bash",
+					Name: "opencode", Source: "npm",
+					Description: "Open-source TUI coding agent (opencode-ai)",
+					InstallMac:   "npm install -g opencode-ai",
+					InstallLinux: "npm install -g opencode-ai",
 					Binary:       "opencode",
 				},
 			},
