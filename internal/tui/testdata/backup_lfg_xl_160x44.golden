@@ -11,23 +11,23 @@
                                                                                                                                                                 
                                                                                                                                                                 
                                                                                                                                                                 
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
                               ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓                              
                                 ▌ lfg │ BACKUP                                                                                                                  
                               ────────────────────────────────────────────────────────────────────────────────────────────────────                              
                                                                                                                                                                 
-                              ┃ ENCRYPT THE BACKUP?                                                                                                             
+                              Encrypt the backup?                                                                                                               
+                              Encrypted = .tar.age (age). Plain = .tar.gz, no secrets.                                                                          
                                                                                                                                                                 
-                              ▸ 01  YES   .tar.age                                                                                                              
-                                     Encrypted via age. Need ~/.config/lfg/key.txt to restore. Safer for dotfiles + env.                                        
-                                                                                                                                                                
-                                02  NO    .tar.gz                                                                                                               
-                                     Plain tar.gz. Inspectable. DO NOT include secrets.                                                                         
-                                                                                                                                                                
-                                                                                                                                                                
+                                               .tar.age     .tar.gz                                                                                             
                                                                                                                                                                 
                               ────────────────────────────────────────────────────────────────────────────────────────────────────                              
-                                [←→] SWITCH  [Y/N] PICK  [⏎] CONFIRM  [⎋] BACK                                                                                  
+                                [←→] SWITCH  [⏎] CONFIRM  [⎋] BACK                                                                                              
                               ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛                              
+                                                                                                                                                                
+                                                                                                                                                                
                                                                                                                                                                 
                                                                                                                                                                 
                                                                                                                                                                 

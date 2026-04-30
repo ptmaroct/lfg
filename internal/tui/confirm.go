@@ -6,18 +6,23 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/anuj/lfg/internal/preset"
 )
 
-// confirmModel — telemetry-style review screen. Big numerals as stat
-// readouts, source breakdown table, then a single Y/N confirm prompt
-// rendered inline (no huh form — kept under the stats so the eye lands
-// on the numbers first, decision second).
+// confirmModel — telemetry-style review screen.
+//
+// Layout: hand-rendered stats row + source breakdown + preview list at
+// the top (read-only data), then a huh.NewConfirm form below for the
+// actual decision. The split keeps the data visualization separate
+// from the form component while still using the proper Charm input
+// for the choice.
 type confirmModel struct {
 	palette   Palette
-	cursor    int // 0 = install, 1 = back
+	form      *huh.Form
+	answer    bool
 	toInstall []preset.Tool
 	alreadyOK int
 	bySource  map[string]int
@@ -38,28 +43,48 @@ func newConfirm(p Palette, bundles []preset.Bundle, selected map[string]bool) co
 			m.bySource[t.Source]++
 		}
 	}
+
+	m.form = huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title(fmt.Sprintf("Install %d tool(s)?", len(m.toInstall))).
+				Description("UX prototype — installers mocked, no system change.").
+				Affirmative("Install").
+				Negative("Back").
+				Value(&m.answer),
+		),
+	).
+		WithTheme(HuhTheme(p)).
+		WithShowHelp(false).
+		WithShowErrors(false)
 	return m
 }
 
-func (m confirmModel) Init() tea.Cmd { return nil }
+func (m confirmModel) Init() tea.Cmd { return m.form.Init() }
 
 func (m confirmModel) Update(msg tea.Msg) (confirmModel, tea.Cmd) {
 	if k, ok := msg.(tea.KeyMsg); ok {
 		switch k.String() {
-		case "left", "h", "right", "l", "tab":
-			m.cursor = 1 - m.cursor
-		case "enter":
-			if m.cursor == 0 {
-				return m, goTo(screenProgress)
-			}
+		case "esc":
 			return m, goTo(screenTree)
 		case "y", "Y":
 			return m, goTo(screenProgress)
-		case "n", "N", "esc":
+		case "n", "N":
 			return m, goTo(screenTree)
 		}
 	}
-	return m, nil
+
+	f, cmd := m.form.Update(msg)
+	if ff, ok := f.(*huh.Form); ok {
+		m.form = ff
+	}
+	if m.form.State == huh.StateCompleted {
+		if m.answer {
+			return m, goTo(screenProgress)
+		}
+		return m, goTo(screenTree)
+	}
+	return m, cmd
 }
 
 func (m confirmModel) View(width, height int) string {
@@ -75,7 +100,6 @@ func (m confirmModel) View(width, height int) string {
 
 	var b strings.Builder
 
-	// Section
 	b.WriteString(SectionLabel(p, "Ready to install", "review summary", contentW))
 	b.WriteString("\n\n")
 
@@ -87,7 +111,7 @@ func (m confirmModel) View(width, height int) string {
 	}))
 	b.WriteString("\n\n")
 
-	// Source breakdown table
+	// Source breakdown
 	b.WriteString("  " + Hairline(p, contentW-2) + "\n")
 	b.WriteString(renderSources(p, m.bySource, contentW))
 	b.WriteString("\n")
@@ -117,15 +141,8 @@ func (m confirmModel) View(width, height int) string {
 		b.WriteString("\n")
 	}
 
-	// Choice buttons
-	b.WriteString(renderConfirmButtons(p, m.cursor))
-	b.WriteString("\n\n")
-
-	// Prototype note
-	warn := lipgloss.NewStyle().Foreground(p.Warn).Bold(true).Render("⚠ ")
-	note := lipgloss.NewStyle().Foreground(p.Muted).Italic(true).
-		Render("UX prototype — installers mocked, no system change.")
-	b.WriteString("  " + warn + note)
+	// huh form drives the decision
+	b.WriteString(m.form.View())
 
 	return Frame(p, width, height,
 		"step 2/2 · confirm",
@@ -184,25 +201,4 @@ func renderSources(p Palette, m map[string]int, contentW int) string {
 	}
 	sep := lipgloss.NewStyle().Foreground(p.Subtle).Render("    ")
 	return "  " + lipgloss.NewStyle().Foreground(p.Muted).Render("VIA  ") + strings.Join(parts, sep)
-}
-
-func renderConfirmButtons(p Palette, cursor int) string {
-	make := func(label string, active bool) string {
-		base := lipgloss.NewStyle().
-			Padding(0, 3).
-			Border(lipgloss.NormalBorder()).
-			BorderForeground(p.Subtle).
-			Foreground(p.Muted)
-		if active {
-			base = base.
-				BorderForeground(p.Primary).
-				Foreground(p.Primary).
-				Bold(true)
-		}
-		return base.Render(label)
-	}
-	left := make("[Y]  INSTALL", cursor == 0)
-	right := make("[N]  BACK", cursor == 1)
-	row := lipgloss.JoinHorizontal(lipgloss.Top, left, "  ", right)
-	return "  " + row
 }
