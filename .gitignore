@@ -27,3 +27,4 @@ chrome-tabs.md
 .agents/
 .claude/
 skills-lock.json
+/dist/

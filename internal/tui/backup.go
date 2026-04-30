@@ -1,27 +1,37 @@
 package tui
 
 import (
+	"fmt"
+	"os"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/dustin/go-humanize"
+
+	"github.com/anuj/lfg/internal/backup"
 )
 
-// backupModel — encrypt y/n prompt (huh.NewConfirm) → fake pack
-// (bubbles.Spinner) → result card.
+// backupModel — encrypt y/n prompt (huh.NewConfirm) → real pack via
+// internal/backup.Pack (bubbles.Spinner during the goroutine) → result
+// card with file path + counters.
 type backupModel struct {
 	palette  Palette
-	step     int // 0=prompt, 1=running, 2=done
+	step     int // 0=prompt, 1=running, 2=done, 3=error
 	form     *huh.Form
 	encrypt  bool
 	spinner  spinner.Model
 	filepath string
+	result   backup.Result
+	err      error
 }
 
-type backupDoneMsg struct{}
+type backupDoneMsg struct {
+	result backup.Result
+	err    error
+}
 
 func newBackup(p Palette) backupModel {
 	sp := spinner.New()
@@ -55,13 +65,14 @@ func (m backupModel) Update(msg tea.Msg) (backupModel, tea.Cmd) {
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
 	case backupDoneMsg:
-		ts := time.Now().Format("2006-01-02")
-		if m.encrypt {
-			m.filepath = "~/lfg-backup-" + ts + ".tar.age"
+		m.result = msg.result
+		m.err = msg.err
+		m.filepath = msg.result.Path
+		if msg.err != nil {
+			m.step = 3
 		} else {
-			m.filepath = "~/lfg-backup-" + ts + ".tar.gz"
+			m.step = 2
 		}
-		m.step = 2
 		return m, nil
 	case tea.KeyMsg:
 		switch m.step {
@@ -69,7 +80,7 @@ func (m backupModel) Update(msg tea.Msg) (backupModel, tea.Cmd) {
 			if msg.String() == "esc" {
 				return m, goTo(screenWelcome)
 			}
-		case 2:
+		case 2, 3:
 			if msg.String() != "q" { // global quit handler owns `q`
 				return m, tea.Quit
 			}
@@ -83,9 +94,15 @@ func (m backupModel) Update(msg tea.Msg) (backupModel, tea.Cmd) {
 		}
 		if m.form.State == huh.StateCompleted {
 			m.step = 1
-			return m, tea.Tick(1200*time.Millisecond, func(time.Time) tea.Msg {
-				return backupDoneMsg{}
-			})
+			encrypt := m.encrypt
+			return m, func() tea.Msg {
+				home, _ := os.UserHomeDir()
+				r, err := backup.Pack(backup.Options{
+					OutDir:  home,
+					Encrypt: encrypt,
+				})
+				return backupDoneMsg{result: r, err: err}
+			}
 		}
 		return m, cmd
 	}
@@ -127,14 +144,29 @@ func (m backupModel) View(width, height int) string {
 			Padding(0, 2).
 			Render(m.filepath)
 		b.WriteString("  " + check + "  saved\n\n")
-		b.WriteString("  " + path + "\n")
+		b.WriteString("  " + path + "\n\n")
+
+		stats := fmt.Sprintf("%d files · %s · %d skipped · %d excluded",
+			m.result.Files, humanize.Bytes(uint64(m.result.Bytes)),
+			m.result.Skipped, m.result.Excluded)
+		b.WriteString("  " + lipgloss.NewStyle().Foreground(p.Muted).Render(stats) + "\n")
+
 		if m.encrypt {
 			b.WriteString("\n")
 			warn := lipgloss.NewStyle().Foreground(p.Warn).Bold(true).Render("⚠ ")
-			note := lipgloss.NewStyle().Foreground(p.Muted).Italic(true).
-				Render("back up ~/.config/lfg/key.txt separately — without it, archive is unrecoverable")
+			msg := "back up " + m.result.KeyPath + " separately"
+			if m.result.NewKey {
+				msg = "GENERATED new key at " + m.result.KeyPath + " — back it up NOW"
+			}
+			note := lipgloss.NewStyle().Foreground(p.Muted).Italic(true).Render(msg)
 			b.WriteString("  " + warn + note)
 		}
+	case 3:
+		b.WriteString(SectionLabel(p, "Backup failed", "", contentW))
+		b.WriteString("\n\n")
+		x := lipgloss.NewStyle().Foreground(p.Warn).Bold(true).Render("✗")
+		b.WriteString("  " + x + "  ")
+		b.WriteString(lipgloss.NewStyle().Foreground(p.Text).Render(m.err.Error()))
 	}
 
 	hint := HintLine(p,
@@ -142,7 +174,7 @@ func (m backupModel) View(width, height int) string {
 		KeyHint(p, "⏎", "confirm"),
 		KeyHint(p, "⎋", "back"),
 	)
-	if m.step == 2 {
+	if m.step == 2 || m.step == 3 {
 		hint = HintLine(p, KeyHint(p, "any", "exit"))
 	}
 

@@ -1,0 +1,93 @@
+version: 2
+
+# goreleaser config for lfg.
+#
+# Builds:  darwin/amd64, darwin/arm64, linux/amd64, linux/arm64
+# Outputs: tar.gz archives + GitHub release + (optional) Homebrew tap formula
+#
+# Tagged release flow (assumes a tag like `v0.1.0`):
+#   1. `git tag v0.1.0 && git push --tags`
+#   2. CI runs `goreleaser release --clean` (.github/workflows/release.yml)
+#   3. Artifacts upload to github.com/ptmaroct/lfg/releases/v0.1.0
+#
+# Local snapshot (no tag, no upload):
+#   make release-snapshot
+#
+# Versions baked in via -ldflags so `lfg version --verbose` works without
+# embedded build metadata files.
+
+project_name: lfg
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: lfg
+    main: ./cmd/lfg
+    binary: lfg
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/anuj/lfg/internal/version.Version={{.Version}}
+      - -X github.com/anuj/lfg/internal/version.Commit={{.ShortCommit}}
+      - -X github.com/anuj/lfg/internal/version.BuildDate={{.Date}}
+
+archives:
+  - id: lfg
+    formats:
+      - tar.gz
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    files:
+      - LICENSE*
+      - README*
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-snapshot-{{ .ShortCommit }}"
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "Merge pull request"
+      - "Merge branch"
+
+# Homebrew tap formula generation. Requires the tap repo to exist at
+# github.com/ptmaroct/homebrew-tap with a `Formula/` dir; the GH token
+# in CI needs write access to that repo. Comment the block out until
+# the tap repo is created.
+#
+# brews:
+#   - repository:
+#       owner: ptmaroct
+#       name: homebrew-tap
+#     directory: Formula
+#     description: "Bootstrap a fresh dev machine with one command"
+#     homepage: "https://github.com/ptmaroct/lfg"
+#     license: MIT
+#     install: |
+#       bin.install "lfg"
+#     test: |
+#       system "#{bin}/lfg version"
+
+release:
+  github:
+    owner: ptmaroct
+    name: lfg
+  prerelease: auto
+  draft: false

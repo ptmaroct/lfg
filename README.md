@@ -8,9 +8,10 @@ Linux dev box — installs the tools you pick, restores your dotfiles, and
 trust. One `curl | sh` away on day one; one command to backup what you
 have on day N.
 
-**Status:** early UX prototype. No installers wired yet — every screen
-runs, every keybind works, but the "install" step is mocked so the UX
-can be tuned before touching your system.
+**Status:** v0.1 ship — installers, detect, backup, doctor, and
+self-update are all live. The TUI shells out to brew/apt/mise/npm
+and streams output into the log tail. Snapshot tests still see a
+deterministic mock so test runs don't touch your system.
 
 ![welcome](assets/welcome.png)
 
@@ -63,9 +64,21 @@ result with key-backup reminder.
 Press `q` from any screen → quit-confirm dialog.
 Press `Ctrl+T` from any screen → cycle theme.
 
-## Install (prototype)
+## Install
 
-Requires Go 1.22+.
+```sh
+curl -fsSL https://raw.githubusercontent.com/ptmaroct/lfg/main/install.sh | sh
+```
+
+The script grabs the latest release tarball for your OS/arch from
+GitHub, drops the `lfg` binary in `/usr/local/bin` (or `~/.local/bin`
+when /usr/local isn't writable). Override prefix or pin a version:
+
+```sh
+LFG_VERSION=v0.1.0 LFG_PREFIX=$HOME/.local sh install.sh
+```
+
+Building from source needs Go 1.22+:
 
 ```sh
 git clone https://github.com/ptmaroct/lfg
@@ -74,20 +87,22 @@ go build -o lfg ./cmd/lfg
 ./lfg
 ```
 
-Once the MVP lands, this becomes:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/lfg-cli/lfg/main/install.sh | sh
-```
-
 ## Usage
 
 ```sh
-./lfg                      # launch TUI (default theme)
-./lfg --theme=lfg          # pink → purple → mint
-./lfg --theme=dracula      # classic Dracula
-./lfg --theme=catppuccin   # Catppuccin Mocha
+lfg                        # launch TUI (default theme)
+lfg --theme=dracula        # explicit theme override
+lfg apply                  # headless install of the 'default' bundle
+lfg apply default ai-clis  # multiple bundles, non-interactively
+lfg apply --dry-run        # preview commands without running them
+lfg backup                 # snapshot dotfiles + configs (tar.age)
+lfg backup --no-encrypt    # plain tar.gz instead
+lfg doctor                 # diagnose environment readiness
+lfg version --verbose      # print build metadata
+lfg update                 # self-update from GitHub releases
 ```
+
+Theme persists in `~/.config/lfg/state.json` so `--theme` is only needed once.
 
 ### Key bindings
 
@@ -114,18 +129,27 @@ curl -fsSL https://raw.githubusercontent.com/lfg-cli/lfg/main/install.sh | sh
 | Forms | [huh](https://github.com/charmbracelet/huh) — select, multi-select, confirm |
 | Styles | [lipgloss](https://github.com/charmbracelet/lipgloss) |
 | Config format | TOML |
-| Encryption | [age](https://github.com/FiloSottile/age) (planned) |
-| Packaging | goreleaser → brew tap + `install.sh` (planned) |
+| CLI lib | [cobra](https://github.com/spf13/cobra) — subcommand dispatch |
+| Encryption | [age](https://github.com/FiloSottile/age) — backup payloads |
+| Self-update | [minio/selfupdate](https://github.com/minio/selfupdate) |
+| Packaging | [goreleaser](https://goreleaser.com) → tarballs + `install.sh` |
 
 ## Repo layout
 
 ```
 lfg/
 ├── cmd/
-│   ├── lfg/main.go             entry — flag parsing, tea program
+│   ├── lfg/main.go             thin entry — calls cli.Execute()
 │   └── snap/main.go            screen → ANSI text helper for screenshots
 ├── internal/
-│   ├── preset/                 bundle + tool data (hardcoded for prototype)
+│   ├── cli/                    cobra subcommands (root, apply, backup, doctor, ...)
+│   ├── preset/                 bundle + tool data (hardcoded for v0.1)
+│   ├── detect/                 binary + version probe (concurrent, timeout-bounded)
+│   ├── installer/              brew/apt/mise/npm/custom + streaming exec
+│   ├── backup/                 tar + age snapshot pipeline
+│   ├── doctor/                 environment readiness checks
+│   ├── state/                  ~/.config/lfg/state.json
+│   ├── version/                ldflags-injected build metadata
 │   └── tui/
 │       ├── app.go              screen state machine + global hotkeys
 │       ├── theme.go            3 palettes + huh theme builder
@@ -134,10 +158,13 @@ lfg/
 │       ├── welcome.go          animated hero + numbered actions
 │       ├── tree_picker.go      collapsible bundle/tool tree
 │       ├── confirm.go          stats row + huh.Confirm
-│       ├── progress.go         spinner + gradient bar + log tail
+│       ├── progress.go         channel-driven log tail wired to installer
 │       ├── done.go             next-steps card
 │       ├── backup.go           huh.Confirm (encrypt) → spinner → result
 │       └── quit_confirm.go     huh.Confirm dialog (`q` from anywhere)
+├── .goreleaser.yaml            release config (4 OS/arch combos)
+├── .github/workflows/release.yml  CI release on tag push
+├── install.sh                  curl|sh installer
 └── assets/                     screenshots
 ```
 
@@ -154,6 +181,7 @@ make widths          # static PNGs per width (needs `freeze`)
 make demo            # animated gif (needs `vhs`)
 make docker          # build container image (Ubuntu + linuxbrew)
 make docker-run      # launch TUI in container
+make release-snapshot  # local goreleaser build of all 4 targets (no upload)
 ```
 
 Single test:
@@ -167,18 +195,20 @@ goldens are clean ANSI-stripped text — diffable in any review tool.
 
 ## Roadmap
 
-**v0.1 (MVP)** — current slice
+**v0.1 (MVP)** — shipped
 
 - [x] TUI skeleton with all screens
 - [x] Animated gradient logo, tactical bulletin chrome
 - [x] 3 themes, swappable via `--theme` or `Ctrl+T`
 - [x] Tree picker with bundle/tool selection
 - [x] Quit-confirm dialog
-- [ ] Real package installers (brew, apt, mise)
-- [ ] Fetch `default.toml` from presets repo
-- [ ] Binary-present + version detection
-- [ ] Real `lfg backup` → tar + optional age encrypt
-- [ ] goreleaser + `install.sh`
+- [x] Real package installers (brew, apt, mise, npm, custom)
+- [x] Binary-present + version detection
+- [x] Real `lfg backup` → tar + optional age encrypt
+- [x] `lfg doctor` env checks
+- [x] `lfg update` self-update
+- [x] goreleaser + `install.sh`
+- [ ] Fetch `default.toml` from presets repo (next iteration; bundles are still hardcoded)
 
 **v0.2** — sync
 
@@ -192,7 +222,6 @@ goldens are clean ANSI-stripped text — diffable in any review tool.
 - `lfg ssh list` (wishlist-powered)
 - `lfg ssh add-device` (fleet pubkey push)
 - macOS `defaults` + `systemsetup` wizard
-- `lfg doctor`
 
 **Deferred / v1+**
 
