@@ -131,11 +131,21 @@ func (m progressModel) View(width, height int) string {
 	}
 
 	var b strings.Builder
-	b.WriteString(SectionLabel(p, "Installing", fmt.Sprintf("%d of %d", m.index, len(m.queue)), contentW))
+
+	// Header strip already says "INSTALLING" — body section label uses
+	// "STATUS" so we don't repeat the same word twice. Right-side suffix
+	// carries the count (was a separate "7 OF 7" line before).
+	statusLabel := "Status"
+	statusSuffix := fmt.Sprintf("%d of %d", m.index, len(m.queue))
+	if m.done {
+		statusLabel = "Complete"
+		statusSuffix = fmt.Sprintf("%d installed", len(m.queue))
+	}
+	b.WriteString(SectionLabel(p, statusLabel, statusSuffix, contentW))
 	b.WriteString("\n\n")
 
-	// Big stat row
-	b.WriteString(renderStatRow(p, contentW, []statCell{
+	// Boxed stat readouts (consistent with confirm screen).
+	b.WriteString(renderStatCells(p, contentW, []statCell{
 		{label: "DONE", value: fmt.Sprintf("%02d", m.index), color: p.Primary},
 		{label: "TOTAL", value: fmt.Sprintf("%02d", len(m.queue)), color: p.Text},
 		{label: "ELAPSED", value: m.stopwatch.View(), color: p.Accent},
@@ -143,12 +153,12 @@ func (m progressModel) View(width, height int) string {
 	}))
 	b.WriteString("\n\n")
 
-	// Bar (full width)
+	// Bar (full width).
 	b.WriteString("  ")
 	b.WriteString(m.bar.ViewAs(pct))
 	b.WriteString("\n\n")
 
-	// Current action
+	// Current action.
 	current := lipgloss.NewStyle().Foreground(p.Muted).Render("— done —")
 	if m.index < len(m.queue) {
 		bold := lipgloss.NewStyle().Foreground(p.Primary).Bold(true)
@@ -163,11 +173,16 @@ func (m progressModel) View(width, height int) string {
 	}
 	b.WriteString("  " + current + "\n\n")
 
-	// Log tail
+	// Log tail — section label header (matches the rest of the screen),
+	// hairlines top + bottom for clear bounding.
+	logLabel := lipgloss.NewStyle().Foreground(p.Muted).Render("LOG")
+	logCount := lipgloss.NewStyle().Foreground(p.Subtle).
+		Render(fmt.Sprintf("· last %d", len(m.logs)))
+	b.WriteString("  " + logLabel + "  " + logCount + "\n")
 	b.WriteString("  " + Hairline(p, contentW-2) + "\n")
-	b.WriteString("  " + lipgloss.NewStyle().Foreground(p.Muted).Render("LOG") + "\n")
 	if len(m.logs) == 0 {
-		b.WriteString("  " + lipgloss.NewStyle().Foreground(p.Muted).Italic(true).Render("(empty)") + "\n")
+		b.WriteString("  " + lipgloss.NewStyle().Foreground(p.Muted).Italic(true).
+			Render("(no entries yet)") + "\n")
 	}
 	for _, line := range m.logs {
 		b.WriteString("  " + line + "\n")

@@ -77,6 +77,9 @@ func keysForScreen(s string) []string {
 	case "confirm":
 		// drive welcome → tree → expand → toggle a few → continue.
 		return []string{"enter", "right", "down", "down", "space", "down", "space", "enter"}
+	case "progress":
+		// welcome → tree → expand → toggle → enter → confirm → install
+		return []string{"enter", "right", "down", "space", "enter", "enter"}
 	case "backup":
 		return []string{"down", "enter"}
 	default:
