@@ -8,11 +8,12 @@ import (
 
 // Frame is the outer chrome applied to every screen.
 //
-// Aesthetic: tactical bulletin. Heavy ━ rules at top + bottom strips,
-// hairline ─ rules within content. Content is left-padded; no centered
-// rounded card. Header strip = brand mark + breadcrumb. Footer strip =
-// key cells. The whole frame is then placed via lipgloss.Place so it
-// sits centered in any terminal size.
+// Aesthetic: tactical bulletin with anchored corners. Heavy corner glyphs
+// (┏ ┓ ┗ ┛) bracket the top and bottom rules so the chrome reads as a
+// container without verticals (verticals on every line break centering).
+// Header strip = brand mark + breadcrumb. Footer strip = key cells.
+// Hairlines (─) divide sections inside the body. The whole frame is then
+// placed via lipgloss.Place so it sits centered in any terminal size.
 //
 // Inner widgets render their own internal hairline rules / tables;
 // Frame only owns the outer two strips.
@@ -33,29 +34,30 @@ func Frame(p Palette, width, height int, subtitle, inner, footer string, compact
 	crumb := lipgloss.NewStyle().Foreground(p.Text).Render(strings.ToUpper(subtitle))
 	leftStrip := brand + dot + crumb
 
-	heavy := lipgloss.NewStyle().Foreground(p.Subtle).Render(strings.Repeat("━", canvasW))
-
 	// Right-side breadcrumb empty for now; could carry "v0.1" or theme name.
 	rightStrip := ""
 	header := joinStrip(canvasW, leftStrip, rightStrip)
 
-	// Footer strip: heavy rule + key cells.
+	// Top + bottom anchored rules with corner glyphs.
+	topRule := renderCornerRule(p, canvasW, "top")
+	botRule := renderCornerRule(p, canvasW, "bottom")
+	hairline := lipgloss.NewStyle().Foreground(p.Hairline).Render(strings.Repeat("─", canvasW))
+
 	footerLine := footer
 
-	// Pad inner content with 2-char left margin so headings line up with
-	// the strip's brand mark.
+	// Inner content padding (currently no extra indent — body manages its own).
 	innerPadded := indent(inner, 0)
 
 	body := strings.Join([]string{
-		heavy,
+		topRule,
 		header,
-		heavy,
+		hairline,
 		"",
 		innerPadded,
 		"",
-		heavy,
+		hairline,
 		footerLine,
-		heavy,
+		botRule,
 	}, "\n")
 
 	// Pad every body line to canvasW. lipgloss.Place centers each line
@@ -69,6 +71,28 @@ func Frame(p Palette, width, height int, subtitle, inner, footer string, compact
 		return body
 	}
 	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, body)
+}
+
+// renderCornerRule builds the top or bottom rule with anchored corners.
+// Top:    ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+// Bottom: ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+// Corners take Primary; the bar takes Subtle for a calmer rule.
+func renderCornerRule(p Palette, width int, pos string) string {
+	if width < 2 {
+		return ""
+	}
+	var lc, rc string
+	switch pos {
+	case "top":
+		lc, rc = "┏", "┓"
+	case "bottom":
+		lc, rc = "┗", "┛"
+	default:
+		lc, rc = "━", "━"
+	}
+	corner := lipgloss.NewStyle().Foreground(p.Primary).Bold(true)
+	bar := lipgloss.NewStyle().Foreground(p.Subtle)
+	return corner.Render(lc) + bar.Render(strings.Repeat("━", width-2)) + corner.Render(rc)
 }
 
 // padLinesTo right-pads every line in s to width visible columns.

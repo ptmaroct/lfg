@@ -12,7 +12,7 @@ type screen int
 
 const (
 	screenWelcome screen = iota
-	screenTree // unified bundle + tool picker (tree view)
+	screenTree    // unified bundle + tool picker (tree view)
 	screenBundles
 	screenTools
 	screenConfirm
@@ -21,17 +21,19 @@ const (
 	screenBackupPrompt
 	screenBackupDone
 	screenQuit
+	screenQuitConfirm
 )
 
 // Model is the root bubbletea model. Each screen is a child model;
 // Update dispatches based on current `screen`.
 type Model struct {
-	screen  screen
-	width   int
-	height  int
-	palette Palette
-	theme   ThemeName
-	bundles []preset.Bundle
+	screen     screen
+	prevScreen screen // saved before transitioning to screenQuitConfirm
+	width      int
+	height     int
+	palette    Palette
+	theme      ThemeName
+	bundles    []preset.Bundle
 
 	welcome      welcomeModel
 	tree         treePickerModel
@@ -41,6 +43,7 @@ type Model struct {
 	progress     progressModel
 	done         doneModel
 	backup       backupModel
+	quitConfirm  quitConfirmModel
 
 	selectedBundleIDs map[string]bool
 	selectedTools     map[string]bool // key = bundleID + "/" + toolName
@@ -77,15 +80,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		// Forward size to active screen so inner widgets resize.
 		return m.forwardSize(msg)
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
 			m.screen = screenQuit
 			return m, tea.Quit
 		}
+		// Global `q` → quit confirm dialog. Don't intercept if already in
+		// the confirm screen (so Y/N letter keys reach the dialog).
+		if msg.String() == "q" && m.screen != screenQuitConfirm {
+			m.prevScreen = m.screen
+			m.screen = screenQuitConfirm
+			m.quitConfirm = newQuitConfirm(m.palette)
+			return m, m.quitConfirm.Init()
+		}
 	case transitionMsg:
 		return m.transition(msg)
+	case quitCancelMsg:
+		m.screen = m.prevScreen
+		// Re-init the previous screen if it was welcome (so animation tick resumes).
+		if m.screen == screenWelcome {
+			return m, m.welcome.Init()
+		}
+		return m, nil
 	}
 
 	var cmd tea.Cmd
@@ -106,6 +123,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.done, cmd = m.done.Update(msg)
 	case screenBackupPrompt, screenBackupDone:
 		m.backup, cmd = m.backup.Update(msg)
+	case screenQuitConfirm:
+		m.quitConfirm, cmd = m.quitConfirm.Update(msg)
 	}
 	return m, cmd
 }
@@ -129,6 +148,8 @@ func (m Model) forwardSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		m.done, cmd = m.done.Update(msg)
 	case screenBackupPrompt, screenBackupDone:
 		m.backup, cmd = m.backup.Update(msg)
+	case screenQuitConfirm:
+		m.quitConfirm, cmd = m.quitConfirm.Update(msg)
 	}
 	return m, cmd
 }
@@ -151,6 +172,8 @@ func (m Model) View() string {
 		return m.done.View(m.width, m.height)
 	case screenBackupPrompt, screenBackupDone:
 		return m.backup.View(m.width, m.height)
+	case screenQuitConfirm:
+		return m.quitConfirm.View(m.width, m.height)
 	case screenQuit:
 		return ""
 	}
@@ -198,6 +221,9 @@ func (m Model) transition(msg transitionMsg) (tea.Model, tea.Cmd) {
 	case screenBackupPrompt:
 		m.backup = newBackup(m.palette)
 		return m, m.backup.Init()
+	case screenQuitConfirm:
+		m.quitConfirm = newQuitConfirm(m.palette)
+		return m, m.quitConfirm.Init()
 	case screenQuit:
 		return m, tea.Quit
 	}
