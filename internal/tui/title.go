@@ -4,79 +4,106 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	figure "github.com/common-nighthawk/go-figure"
 )
 
-// RenderTitle produces the big gradient banner for `lfg`.
-// When `compact` is true (small terminals) it returns a single-line
-// gradient-colored "lfg" instead of figlet art.
-func RenderTitle(p Palette, text string, compact bool) string {
+// Hand-drawn LFG logo built from pure full-block `█` glyphs.
+//
+// Why pure blocks: the previous ANSI-Shadow style mixed `█` with box-
+// drawing chars (`╗╔╚╝`), which render with visible gaps in many
+// monospace fonts (Ghostty, iTerm, etc.) — the letters fragmented into
+// disconnected pieces. Pure `█` rows render solid in every font and
+// gradient-color cleanly per column for the sweep animation.
+//
+// Every row is right-padded to identical visible width so column-indexed
+// coloring lines up cleanly.
+var lfgLogo = []string{
+	`██      ██████   █████ `,
+	`██      ██      ██     `,
+	`██      █████   ██ ███ `,
+	`██      ██      ██  ██ `,
+	`██████  ██       ████  `,
+}
+
+// Compact single-line gradient text for tiny terminals (height < 22).
+func renderCompactBrand(p Palette, text string) string {
+	return renderGradientString(p.Gradient, strings.ToUpper(text), 0, true)
+}
+
+// RenderTitle returns the brand mark, optionally with an animation phase
+// for the gradient sweep. `phase` shifts the gradient stops horizontally
+// — pass 0 for deterministic (snapshot tests), increment per tick for
+// the running TUI.
+func RenderTitle(p Palette, text string, compact bool, phase int) string {
 	if compact {
-		return renderGradientString(p.Gradient, strings.ToUpper(text), true)
+		return renderCompactBrand(p, text)
 	}
 
-	// Bundled fonts: standard, slant, big, doom, larry3d, rectangles, roman,
-	// smslant, banner, basic, bell, big, block, bubble, digital, ivrit, lean,
-	// mini, mnemonic, script, shadow, term. "big" reads cleanest for short
-	// brand names; "slant" was too slashy for "lfg".
-	fig := figure.NewFigure(text, "standard", true)
-	raw := fig.String()
-
-	// Strip trailing blank lines figure likes to pad with.
-	raw = strings.TrimRight(raw, "\n ")
-
-	// Gradient each non-space column across the width for a horizontal blend.
-	lines := strings.Split(raw, "\n")
+	// We render `lfg` always — `text` arg kept for API compatibility but
+	// the hand-drawn glyphs only cover those three letters.
 	maxW := 0
-	for _, ln := range lines {
-		if lipgloss.Width(ln) > maxW {
-			maxW = lipgloss.Width(ln)
+	for _, ln := range lfgLogo {
+		if w := lipgloss.Width(ln); w > maxW {
+			maxW = w
 		}
 	}
 	if maxW == 0 {
 		return ""
 	}
 
-	blend := lipgloss.Color("#FF5FD9")
-	_ = blend
-	colors := blend1D(maxW, p.Gradient...)
+	// Build a wider gradient and shift by phase so colors slide across.
+	// 2× width gives smoother motion without wraparound seams.
+	colors := blend1D(maxW*2, repeatStops(p.Gradient, 2)...)
 
 	var out strings.Builder
-	for li, ln := range lines {
-		visible := 0
-		for i, r := range ln {
+	for li, ln := range lfgLogo {
+		col := 0
+		for _, r := range ln {
 			if r == ' ' {
 				out.WriteRune(r)
-				visible++
+				col++
 				continue
 			}
-			c := colors[min2(i, len(colors)-1)]
+			c := colors[(col+phase)%len(colors)]
 			style := lipgloss.NewStyle().Foreground(c).Bold(true)
 			out.WriteString(style.Render(string(r)))
-			visible++
+			col++
 		}
-		// Right-pad to maxW so every line has identical visible width.
-		// Without this, downstream Align(Center) re-centers each line on
-		// its own width, drifting the figlet shape apart.
-		if pad := maxW - visible; pad > 0 {
+		// Right-pad each row so downstream center-placement treats the
+		// whole block as one rectangle (otherwise short rows recenter).
+		if pad := maxW - col; pad > 0 {
 			out.WriteString(strings.Repeat(" ", pad))
 		}
-		if li < len(lines)-1 {
+		if li < len(lfgLogo)-1 {
 			out.WriteByte('\n')
 		}
 	}
 	return out.String()
 }
 
+// repeatStops loops the palette stops `times` times so blend1D produces a
+// wider strip we can offset for animation.
+func repeatStops(stops []lipgloss.Color, times int) []lipgloss.Color {
+	if times <= 1 {
+		return stops
+	}
+	out := make([]lipgloss.Color, 0, len(stops)*times)
+	for i := 0; i < times; i++ {
+		out = append(out, stops...)
+	}
+	return out
+}
+
 // renderGradientString colors each non-space rune on a horizontal gradient.
-func renderGradientString(stops []lipgloss.Color, s string, bold bool) string {
+// `phase` shifts the gradient for animation.
+func renderGradientString(stops []lipgloss.Color, s string, phase int, bold bool) string {
 	if len(s) == 0 {
 		return ""
 	}
-	colors := blend1D(len(s), stops...)
+	colors := blend1D(len(s)*2, repeatStops(stops, 2)...)
 	var b strings.Builder
 	for i, r := range s {
-		style := lipgloss.NewStyle().Foreground(colors[i])
+		c := colors[(i+phase)%len(colors)]
+		style := lipgloss.NewStyle().Foreground(c)
 		if bold {
 			style = style.Bold(true)
 		}
@@ -105,10 +132,8 @@ func blend1D(n int, stops ...lipgloss.Color) []lipgloss.Color {
 	}
 
 	out := make([]lipgloss.Color, n)
-	// Split N across (len(stops)-1) segments
 	segments := len(stops) - 1
 	for i := 0; i < n; i++ {
-		// position in [0, segments]
 		pos := float64(i) / float64(n-1) * float64(segments)
 		segIdx := int(pos)
 		if segIdx >= segments {

@@ -6,15 +6,17 @@ import (
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 )
 
-// backupModel — encrypt y/n prompt → fake pack → result card.
+// backupModel — encrypt y/n prompt (huh.NewConfirm) → fake pack
+// (bubbles.Spinner) → result card.
 type backupModel struct {
 	palette  Palette
 	step     int // 0=prompt, 1=running, 2=done
+	form     *huh.Form
 	encrypt  bool
-	cursor   int // 0=encrypt, 1=plain
 	spinner  spinner.Model
 	filepath string
 }
@@ -25,45 +27,29 @@ func newBackup(p Palette) backupModel {
 	sp := spinner.New()
 	sp.Spinner = spinner.Dot
 	sp.Style = lipgloss.NewStyle().Foreground(p.Primary)
-	return backupModel{palette: p, spinner: sp}
+	m := backupModel{palette: p, spinner: sp, encrypt: true}
+	m.form = huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title("Encrypt the backup?").
+				Description("Encrypted = .tar.age (age). Plain = .tar.gz, no secrets.").
+				Affirmative(".tar.age").
+				Negative(".tar.gz").
+				Value(&m.encrypt),
+		),
+	).
+		WithTheme(HuhTheme(p)).
+		WithShowHelp(false).
+		WithShowErrors(false)
+	return m
 }
 
-func (m backupModel) Init() tea.Cmd { return m.spinner.Tick }
+func (m backupModel) Init() tea.Cmd {
+	return tea.Batch(m.spinner.Tick, m.form.Init())
+}
 
 func (m backupModel) Update(msg tea.Msg) (backupModel, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch m.step {
-		case 0:
-			switch msg.String() {
-			case "left", "h", "right", "l", "tab":
-				m.cursor = 1 - m.cursor
-			case "enter":
-				m.encrypt = m.cursor == 0
-				m.step = 1
-				return m, tea.Tick(1200*time.Millisecond, func(time.Time) tea.Msg {
-					return backupDoneMsg{}
-				})
-			case "y", "Y":
-				m.encrypt = true
-				m.cursor = 0
-				m.step = 1
-				return m, tea.Tick(1200*time.Millisecond, func(time.Time) tea.Msg {
-					return backupDoneMsg{}
-				})
-			case "n", "N":
-				m.encrypt = false
-				m.cursor = 1
-				m.step = 1
-				return m, tea.Tick(1200*time.Millisecond, func(time.Time) tea.Msg {
-					return backupDoneMsg{}
-				})
-			case "esc":
-				return m, goTo(screenWelcome)
-			}
-		case 2:
-			return m, tea.Quit
-		}
 	case spinner.TickMsg:
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
@@ -76,6 +62,32 @@ func (m backupModel) Update(msg tea.Msg) (backupModel, tea.Cmd) {
 			m.filepath = "~/lfg-backup-" + ts + ".tar.gz"
 		}
 		m.step = 2
+		return m, nil
+	case tea.KeyMsg:
+		switch m.step {
+		case 0:
+			if msg.String() == "esc" {
+				return m, goTo(screenWelcome)
+			}
+		case 2:
+			if msg.String() != "q" { // global quit handler owns `q`
+				return m, tea.Quit
+			}
+		}
+	}
+
+	if m.step == 0 {
+		f, cmd := m.form.Update(msg)
+		if ff, ok := f.(*huh.Form); ok {
+			m.form = ff
+		}
+		if m.form.State == huh.StateCompleted {
+			m.step = 1
+			return m, tea.Tick(1200*time.Millisecond, func(time.Time) tea.Msg {
+				return backupDoneMsg{}
+			})
+		}
+		return m, cmd
 	}
 	return m, nil
 }
@@ -95,26 +107,7 @@ func (m backupModel) View(width, height int) string {
 
 	switch m.step {
 	case 0:
-		b.WriteString(SectionLabel(p, "Encrypt the backup?", "", contentW))
-		b.WriteString("\n\n")
-
-		opts := []struct{ label, desc string }{
-			{"YES   .tar.age", "Encrypted via age. Need ~/.config/lfg/key.txt to restore. Safer for dotfiles + env."},
-			{"NO    .tar.gz", "Plain tar.gz. Inspectable. DO NOT include secrets."},
-		}
-		for i, o := range opts {
-			num := lipgloss.NewStyle().Foreground(p.Muted).Render("0" + sprint1(i+1))
-			gutter := "  "
-			labelStyle := lipgloss.NewStyle().Foreground(p.Text).Bold(true)
-			descStyle := lipgloss.NewStyle().Foreground(p.Muted).Italic(true)
-			if i == m.cursor {
-				gutter = lipgloss.NewStyle().Foreground(p.Primary).Bold(true).Render("▸ ")
-				num = lipgloss.NewStyle().Foreground(p.Primary).Bold(true).Render("0" + sprint1(i+1))
-				labelStyle = labelStyle.Foreground(p.Primary)
-			}
-			b.WriteString(gutter + num + "  " + labelStyle.Render(o.label) + "\n")
-			b.WriteString("       " + descStyle.Render(o.desc) + "\n\n")
-		}
+		b.WriteString(m.form.View())
 	case 1:
 		b.WriteString(SectionLabel(p, "Packing", "", contentW))
 		b.WriteString("\n\n")
@@ -146,7 +139,6 @@ func (m backupModel) View(width, height int) string {
 
 	hint := HintLine(p,
 		KeyHint(p, "←→", "switch"),
-		KeyHint(p, "Y/N", "pick"),
 		KeyHint(p, "⏎", "confirm"),
 		KeyHint(p, "⎋", "back"),
 	)

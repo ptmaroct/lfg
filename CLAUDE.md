@@ -10,6 +10,39 @@ no system change happens. The product plan, including the v0.2/v0.3 road,
 lives in `README.md`. Treat the prototype as the contract and don't wire
 real installers without the user's go-ahead.
 
+## UI rule — always use Charm components
+
+This project lives in the Charm ecosystem and ships `bubbletea`, `huh`,
+`bubbles`, `lipgloss` already. **Use them. Do not hand-roll widgets when
+a Charm component exists.**
+
+| Need | Use | Don't write |
+|------|-----|-------------|
+| yes/no decision | `huh.NewConfirm` | custom Y/N button row |
+| pick one of N | `huh.NewSelect` | custom cursor list |
+| pick many | `huh.NewMultiSelect` | custom checkbox list |
+| text input | `huh.NewInput` / `bubbles/textinput` | custom prompt |
+| password / secret | `huh.NewInput().EchoMode(huh.EchoPassword)` | masked rolled-by-hand |
+| filterable list | `bubbles/list` | custom delegate from scratch |
+| spinner | `bubbles/spinner` | dot animation by hand |
+| progress bar | `bubbles/progress` | block-string interpolator |
+| stopwatch / timer | `bubbles/stopwatch` / `bubbles/timer` | time.Since loop |
+| scrolling log | `bubbles/viewport` | manual line-tail slice |
+| key help footer | `bubbles/help` (or our `KeyHint`/`HintLine`) | from scratch |
+| paginator | `bubbles/paginator` | counter widget |
+
+Style/theming goes through `lipgloss` + `HuhTheme(palette)` — no raw
+ANSI escapes, no inline ad-hoc color constants.
+
+When the design needs something Charm doesn't ship (e.g. the welcome
+hero, the tactical stats row, the tree picker rows), build it on top of
+`lipgloss` styles — but the *interactive* primitives must be Charm.
+This keeps keybindings, theming, focus management, and a11y consistent
+across the app.
+
+If you find yourself reinventing buttons, checkboxes, selects, or text
+inputs: stop and use `huh`.
+
 ## Common commands
 
 ```sh

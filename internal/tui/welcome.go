@@ -2,23 +2,37 @@ package tui
 
 import (
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
 // welcomeModel — first-screen entry. Custom render (not huh) so we can
-// place the figlet hero AND the numbered action list in one composition.
+// place the animated logo hero AND the numbered action list in one
+// composition. The logo gradient sweeps via a tick-driven `phase`
+// counter (~80 ms cadence, 5 columns per tick visual feel).
 type welcomeModel struct {
 	palette Palette
 	cursor  int
 	choices []welcomeChoice
+	phase   int // animation offset for gradient sweep
 }
 
 type welcomeChoice struct {
 	label  string
 	desc   string
 	action screen
+}
+
+// logoTickMsg fires periodically to advance the gradient sweep on the
+// welcome banner. Carried by tickCmd below.
+type logoTickMsg struct{}
+
+func logoTickCmd() tea.Cmd {
+	return tea.Tick(80*time.Millisecond, func(time.Time) tea.Msg {
+		return logoTickMsg{}
+	})
 }
 
 func newWelcome(p Palette) welcomeModel {
@@ -44,11 +58,15 @@ func newWelcome(p Palette) welcomeModel {
 	}
 }
 
-func (m welcomeModel) Init() tea.Cmd { return nil }
+func (m welcomeModel) Init() tea.Cmd { return logoTickCmd() }
 
 func (m welcomeModel) Update(msg tea.Msg) (welcomeModel, tea.Cmd) {
-	if k, ok := msg.(tea.KeyMsg); ok {
-		switch k.String() {
+	switch msg := msg.(type) {
+	case logoTickMsg:
+		m.phase = (m.phase + 1) % 1000 // any large number; mod inside renderer
+		return m, logoTickCmd()
+	case tea.KeyMsg:
+		switch msg.String() {
 		case "up", "k":
 			if m.cursor > 0 {
 				m.cursor--
@@ -59,8 +77,8 @@ func (m welcomeModel) Update(msg tea.Msg) (welcomeModel, tea.Cmd) {
 			}
 		case "enter":
 			return m, goTo(m.choices[m.cursor].action)
-		case "esc", "q":
-			return m, tea.Quit
+		case "esc":
+			return m, goTo(screenQuitConfirm)
 		case "1":
 			m.cursor = 0
 			return m, goTo(m.choices[0].action)
@@ -90,10 +108,10 @@ func (m welcomeModel) View(width, height int) string {
 
 	var b strings.Builder
 
-	// Hero block — figlet on big terminals, single-line gradient on small.
-	hero := RenderTitle(p, "lfg", compact)
+	// Hero block — animated gradient logo on big terminals, single-line on small.
+	hero := RenderTitle(p, "lfg", compact, m.phase)
 	b.WriteString(lipgloss.PlaceHorizontal(contentW, lipgloss.Center, hero))
-	b.WriteString("\n")
+	b.WriteString("\n\n")
 	tagline := lipgloss.NewStyle().Foreground(p.Muted).Italic(true).
 		Render("a new dev machine, in less time than this hint takes to read")
 	b.WriteString(lipgloss.PlaceHorizontal(contentW, lipgloss.Center, tagline))
@@ -115,7 +133,8 @@ func (m welcomeModel) View(width, height int) string {
 			KeyHint(p, "↑↓", "nav"),
 			KeyHint(p, "1-3", "jump"),
 			KeyHint(p, "⏎", "select"),
-			KeyHint(p, "⎋", "quit"),
+			KeyHint(p, "^T", "theme"),
+			KeyHint(p, "Q", "quit"),
 		),
 		compact,
 	)

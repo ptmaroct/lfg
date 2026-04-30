@@ -1,4 +1,4 @@
-# vhs tape — record welcome → bundles → tools flow as a gif
+# vhs tape — record full lfg flow as gif (welcome → tree → confirm → done)
 # install vhs:  brew install vhs
 # render:       vhs demos/welcome.tape
 # output:       demos/welcome.gif
@@ -7,43 +7,47 @@ Output demos/welcome.gif
 Set Shell zsh
 Set FontSize 14
 Set Width 1200
-Set Height 700
+Set Height 720
 Set Theme "Dracula"
+Set Padding 20
 
 Type "./lfg"
 Enter
-Sleep 1500ms
+Sleep 2.5s
 
-# Welcome screen: pick install
+# Welcome — let logo gradient sweep for a beat
+Sleep 1.5s
+
+# Pick install recommended setup
+Enter
+Sleep 1s
+
+# Tree picker — expand DEFAULT, scroll a bit, select stuff
+Right
+Sleep 800ms
+Down Down Down
+Sleep 400ms
+Space
+Sleep 200ms
+Down Down
+Sleep 200ms
+Space
+Sleep 600ms
+Left
+Sleep 600ms
+Down
+Right
 Sleep 500ms
-Enter
-Sleep 1s
-
-# Bundle picker: toggle ai-clis on
-Down
-Down
+Down Down
 Sleep 200ms
-Type "x"
+Space
 Sleep 400ms
 Enter
-Sleep 1s
+Sleep 1.2s
 
-# Tool picker: scroll, filter, toggle
-Down Down Down Down
-Sleep 200ms
-Type "/"
-Type "lazy"
-Sleep 600ms
-Escape
-Sleep 400ms
-Enter
-Sleep 1500ms
+# Confirm — install
+Type "y"
+Sleep 8s
 
-# Confirm
-Sleep 600ms
-Enter
-Sleep 6s
-
-# Done screen
-Sleep 1s
+# Done
 Enter

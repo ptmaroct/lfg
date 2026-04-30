@@ -12,7 +12,7 @@ type screen int
 
 const (
 	screenWelcome screen = iota
-	screenTree // unified bundle + tool picker (tree view)
+	screenTree    // unified bundle + tool picker (tree view)
 	screenBundles
 	screenTools
 	screenConfirm
@@ -21,17 +21,19 @@ const (
 	screenBackupPrompt
 	screenBackupDone
 	screenQuit
+	screenQuitConfirm
 )
 
 // Model is the root bubbletea model. Each screen is a child model;
 // Update dispatches based on current `screen`.
 type Model struct {
-	screen  screen
-	width   int
-	height  int
-	palette Palette
-	theme   ThemeName
-	bundles []preset.Bundle
+	screen     screen
+	prevScreen screen // saved before transitioning to screenQuitConfirm
+	width      int
+	height     int
+	palette    Palette
+	theme      ThemeName
+	bundles    []preset.Bundle
 
 	welcome      welcomeModel
 	tree         treePickerModel
@@ -41,6 +43,7 @@ type Model struct {
 	progress     progressModel
 	done         doneModel
 	backup       backupModel
+	quitConfirm  quitConfirmModel
 
 	selectedBundleIDs map[string]bool
 	selectedTools     map[string]bool // key = bundleID + "/" + toolName
@@ -77,15 +80,37 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		// Forward size to active screen so inner widgets resize.
 		return m.forwardSize(msg)
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
 			m.screen = screenQuit
 			return m, tea.Quit
 		}
+		// Global `q` → quit confirm dialog. Don't intercept if already in
+		// the confirm screen (so Y/N letter keys reach the dialog).
+		if msg.String() == "q" && m.screen != screenQuitConfirm {
+			m.prevScreen = m.screen
+			m.screen = screenQuitConfirm
+			m.quitConfirm = newQuitConfirm(m.palette)
+			return m, m.quitConfirm.Init()
+		}
+		// Global `ctrl+t` → cycle theme (lfg → dracula → catppuccin → lfg).
+		// Use ctrl-prefixed so plain `t` stays available as filter input
+		// inside huh.MultiSelect-based pickers.
+		if msg.String() == "ctrl+t" {
+			m.theme = nextTheme(m.theme)
+			m.palette = PaletteFor(m.theme)
+			return m.rehydrate()
+		}
 	case transitionMsg:
 		return m.transition(msg)
+	case quitCancelMsg:
+		m.screen = m.prevScreen
+		// Re-init the previous screen if it was welcome (so animation tick resumes).
+		if m.screen == screenWelcome {
+			return m, m.welcome.Init()
+		}
+		return m, nil
 	}
 
 	var cmd tea.Cmd
@@ -106,6 +131,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.done, cmd = m.done.Update(msg)
 	case screenBackupPrompt, screenBackupDone:
 		m.backup, cmd = m.backup.Update(msg)
+	case screenQuitConfirm:
+		m.quitConfirm, cmd = m.quitConfirm.Update(msg)
 	}
 	return m, cmd
 }
@@ -129,6 +156,8 @@ func (m Model) forwardSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		m.done, cmd = m.done.Update(msg)
 	case screenBackupPrompt, screenBackupDone:
 		m.backup, cmd = m.backup.Update(msg)
+	case screenQuitConfirm:
+		m.quitConfirm, cmd = m.quitConfirm.Update(msg)
 	}
 	return m, cmd
 }
@@ -151,6 +180,8 @@ func (m Model) View() string {
 		return m.done.View(m.width, m.height)
 	case screenBackupPrompt, screenBackupDone:
 		return m.backup.View(m.width, m.height)
+	case screenQuitConfirm:
+		return m.quitConfirm.View(m.width, m.height)
 	case screenQuit:
 		return ""
 	}
@@ -198,8 +229,60 @@ func (m Model) transition(msg transitionMsg) (tea.Model, tea.Cmd) {
 	case screenBackupPrompt:
 		m.backup = newBackup(m.palette)
 		return m, m.backup.Init()
+	case screenQuitConfirm:
+		m.quitConfirm = newQuitConfirm(m.palette)
+		return m, m.quitConfirm.Init()
 	case screenQuit:
 		return m, tea.Quit
+	}
+	return m, nil
+}
+
+// nextTheme cycles through the three built-in themes.
+func nextTheme(t ThemeName) ThemeName {
+	switch t {
+	case ThemeLFG:
+		return ThemeDracula
+	case ThemeDracula:
+		return ThemeCatppuccin
+	default:
+		return ThemeLFG
+	}
+}
+
+// rehydrate rebuilds the active child model with the current palette so
+// a live theme swap (`t` key) takes effect immediately. Selection state
+// flows through the root maps, so no data loss — only screen-local
+// cursor / animation phase resets.
+func (m Model) rehydrate() (tea.Model, tea.Cmd) {
+	switch m.screen {
+	case screenWelcome:
+		m.welcome = newWelcome(m.palette)
+		return m, m.welcome.Init()
+	case screenTree:
+		m.tree = newTreePicker(m.palette, m.bundles, m.selectedBundleIDs, m.selectedTools)
+		return m, m.tree.Init()
+	case screenBundles:
+		m.bundlePicker = newBundlePicker(m.palette, m.bundles, m.selectedBundleIDs)
+		return m, m.bundlePicker.Init()
+	case screenTools:
+		m.toolPicker = newToolPicker(m.palette, m.bundles, m.selectedBundleIDs, m.selectedTools)
+		return m, m.toolPicker.Init()
+	case screenConfirm:
+		m.confirm = newConfirm(m.palette, m.bundles, m.selectedTools)
+		return m, m.confirm.Init()
+	case screenProgress:
+		m.progress = newProgress(m.palette, m.bundles, m.selectedTools)
+		return m, m.progress.Init()
+	case screenDone:
+		m.done = newDone(m.palette)
+		return m, m.done.Init()
+	case screenBackupPrompt, screenBackupDone:
+		m.backup = newBackup(m.palette)
+		return m, m.backup.Init()
+	case screenQuitConfirm:
+		m.quitConfirm = newQuitConfirm(m.palette)
+		return m, m.quitConfirm.Init()
 	}
 	return m, nil
 }
