@@ -4,11 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-`lfg` is an open-source TUI bootstrap CLI for new dev machines. **Current
-state is a UX prototype** — installers are mocked, every screen runs but
-no system change happens. The product plan, including the v0.2/v0.3 road,
-lives in `README.md`. Treat the prototype as the contract and don't wire
-real installers without the user's go-ahead.
+`lfg` is an open-source TUI bootstrap CLI for new dev machines. **v0.1
+ship is real**: installers (brew/apt/mise/npm/custom) execute live,
+detect pass probes binaries, `lfg backup` produces tar/tar.age, `lfg
+doctor` runs environment checks, `lfg update` self-updates from
+GitHub releases. Snapshot tests (`make test`) and the `cmd/snap`
+helper still see deterministic mock data — never the host system.
+
+Cobra-based subcommand surface: `lfg`, `lfg apply`, `lfg backup`,
+`lfg doctor`, `lfg version`, `lfg update`. Default `lfg` (no args)
+launches the TUI. Theme persists in `~/.config/lfg/state.json`.
 
 ## UI rule — always use Charm components
 
@@ -64,8 +69,7 @@ Single test:
 go test ./internal/tui -run TestSnapshot_Welcome/welcome_lfg_md_100x30
 ```
 
-The repo's Go module path is `github.com/anuj/lfg` but the GitHub home is
-`ptmaroct/lfg` — rename the module before public OSS launch.
+Module path matches the GitHub home: `github.com/ptmaroct/lfg`.
 
 ## Architecture
 
@@ -187,7 +191,8 @@ Anything not in v0.1 should not land without revisiting that plan.
 - Re-enabling huh `Group.Base` border without removing the outer Frame card.
 - Per-line `Align(Center)` on multi-line content (figlet, log tail) — use
   `PlaceHorizontal` so blocks center as rectangles.
-- Adding installers without explicit user direction — current build is
-  intentionally mocked.
 - Touching `internal/tui/testdata/` by hand — always regenerate via
   `make snap-update` so all themes/widths stay in sync.
+- Wiring real subprocesses into snapshot tests — `tui.New(theme)` uses
+  `mockProgressRunner`; CLI startup passes `installer.Run`. Don't
+  conflate the two paths.

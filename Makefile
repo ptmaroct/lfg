@@ -1,5 +1,5 @@
 # lfg — build, test, snapshot, demo
-.PHONY: build run test snap snap-update widths demo docker docker-run clean
+.PHONY: build run test snap snap-update widths demo docker docker-run clean release release-snapshot
 
 build:
 	go build -o lfg ./cmd/lfg
@@ -39,6 +39,19 @@ docker:
 docker-run:
 	docker run --rm -it lfg
 
+# Local snapshot release via goreleaser — builds all platforms into
+# ./dist/ without uploading anywhere. Useful for smoke-testing the
+# release config before pushing a tag.
+#   brew install goreleaser/tap/goreleaser
+release-snapshot:
+	goreleaser release --snapshot --clean
+
+# Real release — only run from CI on a tagged push (see
+# .github/workflows/release.yml). Local invocation requires a
+# GITHUB_TOKEN with repo:write scope.
+release:
+	goreleaser release --clean
+
 clean:
 	rm -f lfg lfg-linux
-	rm -rf snaps demos/*.gif
+	rm -rf snaps demos/*.gif dist

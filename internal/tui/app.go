@@ -4,7 +4,7 @@ package tui
 import (
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/anuj/lfg/internal/preset"
+	"github.com/ptmaroct/lfg/internal/preset"
 )
 
 // screen is the high-level TUI state enum.
@@ -47,14 +47,39 @@ type Model struct {
 
 	selectedBundleIDs map[string]bool
 	selectedTools     map[string]bool // key = bundleID + "/" + toolName
+
+	// progressRunner is injected via WithProgressRunner; nil → mock.
+	progressRunner ProgressRunner
 }
 
-// New builds the root model with the given theme.
+// Option mutates a Model under construction. See WithProgressRunner.
+type Option func(*Model)
+
+// WithProgressRunner injects the function used to drive installs on the
+// progress screen. Default is the mock runner (sleeps + canned output)
+// so snapshot tests + the snap helper never touch the host system.
+// CLI startup passes installer.Run for the real thing.
+func WithProgressRunner(r ProgressRunner) Option {
+	return func(m *Model) { m.progressRunner = r }
+}
+
+// New builds the root model with the given theme using the default
+// (hardcoded) bundle data from the preset package. Snapshot tests rely
+// on this constructor giving deterministic, machine-independent state.
+//
+// Real CLI startup uses NewWithBundles after running detect so the
+// picker reflects what's actually installed.
 func New(theme ThemeName) Model {
+	return NewWithBundles(theme, preset.All())
+}
+
+// NewWithBundles is the explicit constructor used after a detect pass.
+// Pass the bundle slice with Installed/Version fields already overlaid
+// (see internal/detect.Apply).
+func NewWithBundles(theme ThemeName, bundles []preset.Bundle, opts ...Option) Model {
 	p := PaletteFor(theme)
-	bs := preset.All()
 	pre := map[string]bool{}
-	for _, bundle := range bs {
+	for _, bundle := range bundles {
 		if bundle.Default {
 			pre[bundle.ID] = true
 		}
@@ -63,17 +88,24 @@ func New(theme ThemeName) Model {
 		screen:            screenWelcome,
 		palette:           p,
 		theme:             theme,
-		bundles:           bs,
+		bundles:           bundles,
 		selectedBundleIDs: pre,
 		selectedTools:     map[string]bool{},
 	}
 	m.welcome = newWelcome(p)
+	for _, o := range opts {
+		o(&m)
+	}
 	return m
 }
 
 func (m Model) Init() tea.Cmd {
 	return m.welcome.Init()
 }
+
+// Theme returns the currently active theme name. Used by the CLI layer
+// to persist theme changes (Ctrl+T cycling) on clean exit.
+func (m Model) Theme() ThemeName { return m.theme }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -221,7 +253,11 @@ func (m Model) transition(msg transitionMsg) (tea.Model, tea.Cmd) {
 		m.confirm = newConfirm(m.palette, m.bundles, m.selectedTools)
 		return m, m.confirm.Init()
 	case screenProgress:
-		m.progress = newProgress(m.palette, m.bundles, m.selectedTools)
+		runner := m.progressRunner
+		if runner == nil {
+			runner = mockProgressRunner
+		}
+		m.progress = newProgressWithRunner(m.palette, m.bundles, m.selectedTools, runner)
 		return m, m.progress.Init()
 	case screenDone:
 		m.done = newDone(m.palette)
@@ -272,7 +308,11 @@ func (m Model) rehydrate() (tea.Model, tea.Cmd) {
 		m.confirm = newConfirm(m.palette, m.bundles, m.selectedTools)
 		return m, m.confirm.Init()
 	case screenProgress:
-		m.progress = newProgress(m.palette, m.bundles, m.selectedTools)
+		runner := m.progressRunner
+		if runner == nil {
+			runner = mockProgressRunner
+		}
+		m.progress = newProgressWithRunner(m.palette, m.bundles, m.selectedTools, runner)
 		return m, m.progress.Init()
 	case screenDone:
 		m.done = newDone(m.palette)
