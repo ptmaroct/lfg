@@ -15,7 +15,7 @@ import (
 	"github.com/minio/selfupdate"
 	"github.com/spf13/cobra"
 
-	"github.com/anuj/lfg/internal/version"
+	"github.com/ptmaroct/lfg/internal/version"
 )
 
 // releasesAPI is the latest-release endpoint for ptmaroct/lfg. Override

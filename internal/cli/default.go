@@ -5,11 +5,11 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/anuj/lfg/internal/detect"
-	"github.com/anuj/lfg/internal/installer"
-	"github.com/anuj/lfg/internal/preset"
-	"github.com/anuj/lfg/internal/state"
-	"github.com/anuj/lfg/internal/tui"
+	"github.com/ptmaroct/lfg/internal/detect"
+	"github.com/ptmaroct/lfg/internal/installer"
+	"github.com/ptmaroct/lfg/internal/preset"
+	"github.com/ptmaroct/lfg/internal/state"
+	"github.com/ptmaroct/lfg/internal/tui"
 )
 
 // runTUI is the default `lfg` action — launch the interactive bubbletea

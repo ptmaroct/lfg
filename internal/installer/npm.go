@@ -4,7 +4,7 @@ import (
 	"context"
 	"os/exec"
 
-	"github.com/anuj/lfg/internal/preset"
+	"github.com/ptmaroct/lfg/internal/preset"
 )
 
 // npmInstaller handles Source="npm" — global npm packages (codex,

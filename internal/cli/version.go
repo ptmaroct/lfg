@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/anuj/lfg/internal/version"
+	"github.com/ptmaroct/lfg/internal/version"
 )
 
 var versionVerbose bool

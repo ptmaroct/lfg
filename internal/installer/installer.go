@@ -16,7 +16,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/anuj/lfg/internal/preset"
+	"github.com/ptmaroct/lfg/internal/preset"
 )
 
 // Line is one chunk of installer output bound for the TUI / logs.

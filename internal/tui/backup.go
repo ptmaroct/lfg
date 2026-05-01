@@ -11,7 +11,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/dustin/go-humanize"
 
-	"github.com/anuj/lfg/internal/backup"
+	"github.com/ptmaroct/lfg/internal/backup"
 )
 
 // backupModel — encrypt y/n prompt (huh.NewConfirm) → real pack via

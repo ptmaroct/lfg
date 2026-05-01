@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/anuj/lfg/internal/preset"
+	"github.com/ptmaroct/lfg/internal/preset"
 )
 
 // Result is the per-tool probe outcome.

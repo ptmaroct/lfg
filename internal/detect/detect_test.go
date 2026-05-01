@@ -3,7 +3,7 @@ package detect
 import (
 	"testing"
 
-	"github.com/anuj/lfg/internal/preset"
+	"github.com/ptmaroct/lfg/internal/preset"
 )
 
 // TestProbe_AbsentBinary confirms a definitely-missing binary returns a

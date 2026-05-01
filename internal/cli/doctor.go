@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/anuj/lfg/internal/doctor"
+	"github.com/ptmaroct/lfg/internal/doctor"
 )
 
 var doctorCmd = &cobra.Command{

@@ -10,9 +10,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/anuj/lfg/internal/detect"
-	"github.com/anuj/lfg/internal/installer"
-	"github.com/anuj/lfg/internal/preset"
+	"github.com/ptmaroct/lfg/internal/detect"
+	"github.com/ptmaroct/lfg/internal/installer"
+	"github.com/ptmaroct/lfg/internal/preset"
 )
 
 var (

@@ -4,7 +4,7 @@ package tui
 import (
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/anuj/lfg/internal/preset"
+	"github.com/ptmaroct/lfg/internal/preset"
 )
 
 // screen is the high-level TUI state enum.

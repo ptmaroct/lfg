@@ -13,8 +13,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/anuj/lfg/internal/installer"
-	"github.com/anuj/lfg/internal/preset"
+	"github.com/ptmaroct/lfg/internal/installer"
+	"github.com/ptmaroct/lfg/internal/preset"
 )
 
 // ProgressRunner is the function signature progressModel uses to drive

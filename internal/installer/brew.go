@@ -4,7 +4,7 @@ import (
 	"context"
 	"os/exec"
 
-	"github.com/anuj/lfg/internal/preset"
+	"github.com/ptmaroct/lfg/internal/preset"
 )
 
 // brewInstaller handles Source="brew" and Source="cask" tools.

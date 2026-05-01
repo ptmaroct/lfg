@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/anuj/lfg/internal/preset"
+	"github.com/ptmaroct/lfg/internal/preset"
 )
 
 // customInstaller handles Source="custom" — raw shell command from the

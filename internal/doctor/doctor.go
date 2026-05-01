@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/anuj/lfg/internal/state"
+	"github.com/ptmaroct/lfg/internal/state"
 )
 
 // Status enumerates the three Check outcomes.

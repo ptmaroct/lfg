@@ -69,8 +69,7 @@ Single test:
 go test ./internal/tui -run TestSnapshot_Welcome/welcome_lfg_md_100x30
 ```
 
-The repo's Go module path is `github.com/anuj/lfg` but the GitHub home is
-`ptmaroct/lfg` — rename the module before public OSS launch.
+Module path matches the GitHub home: `github.com/ptmaroct/lfg`.
 
 ## Architecture
 

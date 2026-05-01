@@ -1,5 +1,5 @@
 // Package version exposes build-time metadata. The values are populated
-// by goreleaser via -ldflags="-X github.com/anuj/lfg/internal/version.Version=..."
+// by goreleaser via -ldflags="-X github.com/ptmaroct/lfg/internal/version.Version=..."
 // at release time. Defaults below cover `go run` / `go install` builds.
 package version
 

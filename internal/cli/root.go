@@ -10,8 +10,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/anuj/lfg/internal/state"
-	"github.com/anuj/lfg/internal/tui"
+	"github.com/ptmaroct/lfg/internal/state"
+	"github.com/ptmaroct/lfg/internal/tui"
 )
 
 // themeFlag holds the persistent --theme value parsed at the root.

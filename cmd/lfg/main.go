@@ -4,6 +4,6 @@
 // so the package can be imported and exercised from tests.
 package main
 
-import "github.com/anuj/lfg/internal/cli"
+import "github.com/ptmaroct/lfg/internal/cli"
 
 func main() { cli.Execute() }

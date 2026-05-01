@@ -15,7 +15,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
 
-	"github.com/anuj/lfg/internal/tui"
+	"github.com/ptmaroct/lfg/internal/tui"
 )
 
 func main() {

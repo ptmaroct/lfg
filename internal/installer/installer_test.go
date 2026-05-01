@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/anuj/lfg/internal/preset"
+	"github.com/ptmaroct/lfg/internal/preset"
 )
 
 // fakeRun records every invocation so tests can assert on call order

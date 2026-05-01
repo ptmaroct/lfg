@@ -1,4 +1,4 @@
-module github.com/anuj/lfg
+module github.com/ptmaroct/lfg
 
 go 1.25.0
 
