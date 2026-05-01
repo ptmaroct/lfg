@@ -3,6 +3,7 @@ package tui
 import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // quitConfirmModel — huh.NewConfirm dialog shown when the user presses
@@ -67,9 +68,25 @@ func (m quitConfirmModel) Update(msg tea.Msg) (quitConfirmModel, tea.Cmd) {
 }
 
 func (m quitConfirmModel) View(width, height int) string {
+	// Compute the same canvas width Frame uses so the form output sits
+	// inside the frame's bounding box. Without this wrap the raw
+	// huh.Form view can be wider than canvasW, which makes
+	// lipgloss.Place center on the form's width (not the frame's) and
+	// the whole dialog drifts left in wide terminals.
+	canvasW := width - 4
+	if canvasW > 100 {
+		canvasW = 100
+	}
+	if canvasW < 56 {
+		canvasW = 56
+	}
+	contentW := canvasW - 4
+
+	inner := lipgloss.PlaceHorizontal(contentW, lipgloss.Center, m.form.View())
+
 	return Frame(m.palette, width, height,
 		"confirm quit",
-		m.form.View(),
+		inner,
 		HintLine(m.palette,
 			KeyHint(m.palette, "←→", "switch"),
 			KeyHint(m.palette, "Y", "quit"),
