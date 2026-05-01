@@ -38,6 +38,30 @@ func mustWrite(t *testing.T, root, name, content string) {
 	}
 }
 
+func TestPlan_NoFileWritten(t *testing.T) {
+	fakeHome(t)
+	out := t.TempDir()
+	r, err := Plan(Options{
+		OutDir:   out,
+		Encrypt:  false,
+		Hostname: "tester",
+		Now:      time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("Plan: %v", err)
+	}
+	if r.Files == 0 {
+		t.Error("expected file count > 0")
+	}
+	if r.Path != filepath.Join(out, "lfg-backup-tester-2026-05-01.tar.gz") {
+		t.Errorf("path: %s", r.Path)
+	}
+	// The output file must NOT exist after a Plan call.
+	if _, err := os.Stat(r.Path); err == nil {
+		t.Errorf("Plan wrote a file, should be read-only: %s", r.Path)
+	}
+}
+
 func TestPack_PlainGzipRoundTrip(t *testing.T) {
 	fakeHome(t)
 	out := t.TempDir()

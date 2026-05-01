@@ -51,18 +51,60 @@ type Result struct {
 	Excluded    int    // private-key entries blocked by policy
 }
 
-// Pack captures the configured sources to a single file. Returns the
-// Result with the absolute output path. Failure to read an individual
-// source is logged via the Result counters, not fatal.
-func Pack(opts Options) (Result, error) {
-	var r Result
-	r.Encrypted = opts.Encrypt
-
-	if opts.OutDir == "" {
-		opts.OutDir = "."
+// Plan walks the configured sources without opening any output file
+// and returns the Result we *would* produce. Used by `lfg backup
+// --dry-run` and the doctor / preview surfaces. Pure read-only.
+func Plan(opts Options) (Result, error) {
+	r := Result{Encrypted: opts.Encrypt}
+	r.Path = outputPath(opts)
+	sources := opts.Sources
+	if sources == nil {
+		sources = defaultSources()
 	}
-	if err := os.MkdirAll(opts.OutDir, 0o755); err != nil {
-		return r, fmt.Errorf("mkdir %s: %w", opts.OutDir, err)
+	for _, s := range sources {
+		info, err := os.Lstat(s.Path)
+		if err != nil {
+			r.Skipped++
+			continue
+		}
+		count, bytes, excluded := 0, int64(0), 0
+		walk := func(path string, d fs.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if d.IsDir() {
+				return nil
+			}
+			if !(opts.IncludeSSHKeys && opts.Encrypt) && isPrivateSSHKey(path) {
+				excluded++
+				return nil
+			}
+			ii, err := os.Lstat(path)
+			if err != nil {
+				return nil
+			}
+			count++
+			bytes += ii.Size()
+			return nil
+		}
+		if info.IsDir() {
+			_ = filepath.WalkDir(s.Path, walk)
+		} else {
+			_ = walk(s.Path, fs.FileInfoToDirEntry(info), nil)
+		}
+		r.Files += count
+		r.Bytes += bytes
+		r.Excluded += excluded
+	}
+	return r, nil
+}
+
+// outputPath builds the destination filename without creating any file.
+// Shared by Plan and Pack so dry-run output matches the real run.
+func outputPath(opts Options) string {
+	out := opts.OutDir
+	if out == "" {
+		out = "."
 	}
 	host := opts.Hostname
 	if host == "" {
@@ -80,8 +122,23 @@ func Pack(opts Options) (Result, error) {
 	if opts.Encrypt {
 		ext = ".tar.age"
 	}
-	r.Path = filepath.Join(opts.OutDir,
-		fmt.Sprintf("lfg-backup-%s-%s%s", host, stamp.Format("2006-01-02"), ext))
+	return filepath.Join(out, fmt.Sprintf("lfg-backup-%s-%s%s", host, stamp.Format("2006-01-02"), ext))
+}
+
+// Pack captures the configured sources to a single file. Returns the
+// Result with the absolute output path. Failure to read an individual
+// source is logged via the Result counters, not fatal.
+func Pack(opts Options) (Result, error) {
+	var r Result
+	r.Encrypted = opts.Encrypt
+
+	if opts.OutDir == "" {
+		opts.OutDir = "."
+	}
+	if err := os.MkdirAll(opts.OutDir, 0o755); err != nil {
+		return r, fmt.Errorf("mkdir %s: %w", opts.OutDir, err)
+	}
+	r.Path = outputPath(opts)
 
 	f, err := os.OpenFile(r.Path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
 	if err != nil {

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -33,8 +34,18 @@ func runTUI() error {
 	results := detect.ProbeAll(bundles)
 	bundles = detect.Apply(bundles, results)
 
+	// In dry-run mode the TUI still walks every screen — the only
+	// difference is the install step uses the mock runner (canned lines,
+	// short sleeps) so no commands hit the host. Same UX, zero side
+	// effects. Useful for demos + first-time poking.
+	opts := []tui.Option{tui.WithProgressRunner(installer.Run)}
+	if dryRun {
+		opts = []tui.Option{} // empty → mockProgressRunner default
+		fmt.Fprintln(os.Stderr, "lfg: dry-run mode — no commands will be executed")
+	}
+
 	p := tea.NewProgram(
-		tui.NewWithBundles(theme, bundles, tui.WithProgressRunner(installer.Run)),
+		tui.NewWithBundles(theme, bundles, opts...),
 		tea.WithAltScreen(),
 	)
 	final, err := p.Run()

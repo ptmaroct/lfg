@@ -18,6 +18,14 @@ import (
 // Stored at package level so subcommands can read it without re-parsing.
 var themeFlag string
 
+// dryRun is the persistent --dry-run / -n flag. When set every
+// destructive action falls back to its preview path:
+//   - default TUI: installer goroutine swaps to mockProgressRunner
+//   - lfg apply: prints planned commands, doesn't exec
+//   - lfg backup: prints source list + would-be filename, writes nothing
+//   - lfg update: prints target asset URL, doesn't swap binary (TODO)
+var dryRun bool
+
 // rootCmd is the top-level `lfg` command.
 var rootCmd = &cobra.Command{
 	Use:   "lfg",
@@ -45,6 +53,8 @@ func init() {
 	// Persistent so subcommands inherit it (e.g. `lfg apply --theme=dracula`).
 	rootCmd.PersistentFlags().StringVar(&themeFlag, "theme", "",
 		"color theme: lfg, dracula, catppuccin (default: persisted or 'lfg')")
+	rootCmd.PersistentFlags().BoolVarP(&dryRun, "dry-run", "n", false,
+		"preview only — no commands run, no files written")
 }
 
 // resolveTheme picks the theme to use this run. Priority:

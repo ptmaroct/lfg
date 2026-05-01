@@ -94,12 +94,19 @@ lfg                        # launch TUI (default theme)
 lfg --theme=dracula        # explicit theme override
 lfg apply                  # headless install of the 'default' bundle
 lfg apply default ai-clis  # multiple bundles, non-interactively
-lfg apply --dry-run        # preview commands without running them
 lfg backup                 # snapshot dotfiles + configs (tar.age)
-lfg backup --no-encrypt    # plain tar.gz instead
+lfg backup --encrypt=false # plain tar.gz instead
 lfg doctor                 # diagnose environment readiness
 lfg version --verbose      # print build metadata
 lfg update                 # self-update from GitHub releases
+```
+
+`--dry-run` (or `-n`) is a persistent flag — works on every command:
+
+```sh
+lfg -n                     # walk the TUI flow with the install step mocked
+lfg apply -n default       # print planned commands, exec nothing
+lfg backup -n              # list source counts + would-be filename, write nothing
 ```
 
 Theme persists in `~/.config/lfg/state.json` so `--theme` is only needed once.

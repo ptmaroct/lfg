@@ -16,8 +16,7 @@ import (
 )
 
 var (
-	applyDryRun bool
-	applyYes    bool
+	applyYes bool
 )
 
 var applyCmd = &cobra.Command{
@@ -34,8 +33,8 @@ Examples:
 }
 
 func init() {
-	applyCmd.Flags().BoolVar(&applyDryRun, "dry-run", false,
-		"print install commands without executing")
+	// --dry-run is inherited from the root persistent flag; only the
+	// confirmation skip lives locally.
 	applyCmd.Flags().BoolVarP(&applyYes, "yes", "y", false,
 		"skip the confirmation prompt")
 	rootCmd.AddCommand(applyCmd)
@@ -51,7 +50,7 @@ func runApply(cmd *cobra.Command, args []string) error {
 	}
 
 	bundles := preset.All()
-	if !applyDryRun {
+	if !dryRun {
 		// Detect first so we can skip already-installed tools. Cheap on
 		// a warm cache.
 		results := detect.ProbeAll(bundles)
@@ -68,7 +67,7 @@ func runApply(cmd *cobra.Command, args []string) error {
 		}
 		picked = append(picked, b.ID)
 		for _, t := range b.Tools {
-			if t.Installed && !applyDryRun {
+			if t.Installed && !dryRun {
 				continue
 			}
 			selected[b.ID+"/"+t.Name] = true
@@ -80,7 +79,7 @@ func runApply(cmd *cobra.Command, args []string) error {
 
 	plan := installer.Plan(bundles, selected)
 
-	if applyDryRun {
+	if dryRun {
 		fmt.Printf("Plan for bundles %s — %d steps:\n", strings.Join(picked, ", "), len(plan))
 		for i, step := range plan {
 			label := fmt.Sprintf("[%s] %s", step.Backend, step.Tool.Name)

@@ -28,11 +28,22 @@ out-of-band, otherwise encrypted backups cannot be restored.`,
 }
 
 func runBackup(cmd *cobra.Command, args []string) error {
-	r, err := backup.Pack(backup.Options{
+	opts := backup.Options{
 		OutDir:         backupOutDir,
 		Encrypt:        backupEncrypt,
 		IncludeSSHKeys: backupIncludeSSHKeys,
-	})
+	}
+	if dryRun {
+		r, err := backup.Plan(opts)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("(dry-run) would write %s\n", r.Path)
+		fmt.Printf("  %d files · %s · %d sources missing · %d private keys filtered\n",
+			r.Files, humanize.Bytes(uint64(r.Bytes)), r.Skipped, r.Excluded)
+		return nil
+	}
+	r, err := backup.Pack(opts)
 	if err != nil {
 		return err
 	}
