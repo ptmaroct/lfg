@@ -67,23 +67,9 @@ changelog:
       - "Merge pull request"
       - "Merge branch"
 
-# Homebrew tap formula generation. Requires the tap repo to exist at
-# github.com/ptmaroct/homebrew-tap with a `Formula/` dir; the GH token
-# in CI needs write access to that repo. Comment the block out until
-# the tap repo is created.
-#
-# brews:
-#   - repository:
-#       owner: ptmaroct
-#       name: homebrew-tap
-#     directory: Formula
-#     description: "Bootstrap a fresh dev machine with one command"
-#     homepage: "https://github.com/ptmaroct/lfg"
-#     license: MIT
-#     install: |
-#       bin.install "lfg"
-#     test: |
-#       system "#{bin}/lfg version"
+# Homebrew tap is deferred — install.sh covers macOS + Linux from
+# a single curl one-liner. Re-enable when the tap repo lands at
+# github.com/ptmaroct/homebrew-tap (see docs/release.md if/when added).
 
 release:
   github:
