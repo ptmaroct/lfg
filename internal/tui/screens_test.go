@@ -139,6 +139,18 @@ func TestSnapshot_BackupPrompt(t *testing.T) {
 	}
 }
 
+// TestSnapshot_QuitConfirm covers the global `q` quit dialog. Without
+// this test the dialog drifted off-center for weeks because no other
+// snapshot exercised the quitConfirm screen.
+func TestSnapshot_QuitConfirm(t *testing.T) {
+	for _, sz := range sizes {
+		name := "quit_confirm_lfg_" + sz.name
+		t.Run(name, func(t *testing.T) {
+			driveAndSnapshot(t, name, ThemeLFG, sz, "q")
+		})
+	}
+}
+
 // (TestNoControlCharsLeak removed — was a fragile heuristic for an old
 // huh-group-border bug. The redesign uses `│` legitimately as a separator
 // in header strips. Snapshot tests above already catch any visual drift.)
