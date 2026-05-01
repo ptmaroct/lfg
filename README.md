@@ -78,7 +78,7 @@ when /usr/local isn't writable). Override prefix or pin a version:
 LFG_VERSION=v0.1.0 LFG_PREFIX=$HOME/.local sh install.sh
 ```
 
-Building from source needs Go 1.22+:
+Building from source needs Go 1.25+:
 
 ```sh
 git clone https://github.com/ptmaroct/lfg
@@ -130,7 +130,7 @@ Theme persists in `~/.config/lfg/state.json` so `--theme` is only needed once.
 
 | Layer | Choice |
 |-------|--------|
-| Language | Go 1.22+ |
+| Language | Go 1.25+ |
 | TUI framework | [bubbletea](https://github.com/charmbracelet/bubbletea) |
 | Components | [bubbles](https://github.com/charmbracelet/bubbles) — spinner, progress, stopwatch |
 | Forms | [huh](https://github.com/charmbracelet/huh) — select, multi-select, confirm |
