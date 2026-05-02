@@ -139,10 +139,8 @@ func (m confirmModel) View(width, height int) string {
 		"step 2/2 · confirm",
 		b.String(),
 		HintLine(p,
-			KeyHint(p, "←→", "switch"),
 			KeyHint(p, "I", "install"),
 			KeyHint(p, "B", "back"),
-			KeyHint(p, "⏎", "select"),
 		),
 		height < 22,
 	)

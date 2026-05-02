@@ -58,7 +58,7 @@ func (m quitConfirmModel) Update(msg tea.Msg) (quitConfirmModel, tea.Cmd) {
 		switch k.String() {
 		case "y", "Y":
 			return m, tea.Quit
-		case "esc":
+		case "n", "N", "esc", "backspace", "delete":
 			return m, func() tea.Msg { return quitCancelMsg{} }
 		}
 	}
@@ -110,12 +110,8 @@ func (m quitConfirmModel) View(width, height int) string {
 	return Frame(m.palette, width, height,
 		"confirm quit",
 		inner,
-		HintLine(m.palette,
-			KeyHint(m.palette, "←→", "switch"),
-			KeyHint(m.palette, "Y", "quit"),
-			KeyHint(m.palette, "⎋", "cancel"),
-			KeyHint(m.palette, "⏎", "select"),
-		),
+		// No hint line — dialog buttons + Esc are self-explanatory.
+		HintLine(m.palette, KeyHint(m.palette, "⎋", "dismiss")),
 		height < 22,
 	)
 }
