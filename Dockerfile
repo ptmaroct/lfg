@@ -14,14 +14,17 @@ RUN CGO_ENABLED=0 go build -o /out/lfg ./cmd/lfg
 
 FROM ubuntu:24.04
 
-# Bare-bones runtime. We deliberately do NOT preinstall Homebrew here —
-# the whole point of the docker test loop is to exercise lfg's brew
-# bootstrap path on a clean Ubuntu box. Tools that brew installs (mise,
-# node, etc.) all flow from lfg's own install steps.
-#
-# `procps` ships `ps` which the Homebrew installer probes; `file` is
-# also required. Both stay so when lfg DOES install brew, the
-# prereqs are already there.
+# INCLUDE_BREW toggles whether linuxbrew is preinstalled.
+#   1 (default) — fast iteration; brew shows under ALREADY INSTALLED.
+#   0           — bare ubuntu; lfg's brew bootstrap path is exercised
+#                 fully (slow, but tests the real flow).
+# Override per-build:  docker build --build-arg INCLUDE_BREW=0 -t lfg-bare .
+ARG INCLUDE_BREW=1
+
+# Brew prerequisites + general dev basics. `procps` ships `ps` which the
+# Homebrew installer probes; `file` is also required even when we skip
+# the brew install — keeps the prereqs in place so a later in-container
+# `lfg` run can install brew without a missing-dep surprise.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         ca-certificates \
@@ -33,16 +36,40 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         zsh \
     && rm -rf /var/lib/apt/lists/*
 
-# Non-root user. Passwordless sudo so lfg's brew bootstrap (which
-# refuses root) and any post-install steps that need apt packages
-# (e.g. `sudo apt install chromium` for agent-browser on arm64) can
-# run without prompting.
+# Non-root user. Passwordless sudo so brew (which refuses root) and
+# post-install steps (e.g. `sudo apt install chromium` for
+# agent-browser on arm64) run without prompting.
 RUN useradd -m -s /bin/bash dev \
     && echo 'dev ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/dev \
     && chmod 0440 /etc/sudoers.d/dev
 
 USER dev
 WORKDIR /home/dev
+
+# Conditional brew install. ARG re-declared inside the build stage so
+# the RUN below can read it; otherwise the global ARG is invisible to
+# this stage. NONINTERACTIVE=1 is also conditional so a bare image
+# doesn't carry a misleading homebrew env var.
+ARG INCLUDE_BREW
+RUN if [ "$INCLUDE_BREW" = "1" ]; then \
+        export NONINTERACTIVE=1 && \
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" && \
+        echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> /home/dev/.bashrc && \
+        echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> /home/dev/.zshrc && \
+        echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> /home/dev/.profile; \
+    else \
+        echo "skip brew install (INCLUDE_BREW=0)"; \
+    fi
+
+# Brew env vars baked in unconditionally — paths resolve only when the
+# directories exist, so they're harmless when brew was skipped. Saves
+# the conditional dance for ENV (which isn't ARG-aware anyway) and
+# means `lfg` will pick up brew if it's installed later inside the
+# container.
+ENV PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:${PATH}"
+ENV HOMEBREW_PREFIX="/home/linuxbrew/.linuxbrew"
+ENV HOMEBREW_CELLAR="/home/linuxbrew/.linuxbrew/Cellar"
+ENV HOMEBREW_REPOSITORY="/home/linuxbrew/.linuxbrew/Homebrew"
 
 # Drop the lfg binary in.
 USER root
@@ -51,5 +78,4 @@ RUN chmod +x /usr/local/bin/lfg
 
 USER dev
 ENV TERM=xterm-256color
-ENV NONINTERACTIVE=1
 CMD ["lfg"]

@@ -492,7 +492,25 @@ func (m treePickerModel) View(width, height int) string {
 	b.WriteString("  " + Hairline(p, contentW-2))
 	b.WriteByte('\n')
 
-	end := min2(m.offset+m.pageSize, len(m.rows))
+	// Dynamic page size: chrome around the rows (frame top/bottom,
+	// section label, column header, two hairlines, footer + hints) eats
+	// ~14 rows total. Whatever remains is row capacity. Without this,
+	// pageSize stayed at the constructor default (16) and a tall
+	// terminal still cut off rows that should've been visible — users
+	// had to manually scroll to see what was already on the screen.
+	pageSize := height - 14
+	if pageSize < 6 {
+		pageSize = 6
+	}
+	m.pageSize = pageSize
+	if m.cursor >= m.offset+pageSize {
+		m.offset = m.cursor - pageSize + 1
+	}
+
+	end := m.offset + pageSize
+	if end > len(m.rows) {
+		end = len(m.rows)
+	}
 	for i := m.offset; i < end; i++ {
 		b.WriteString(m.renderRow(i))
 		b.WriteByte('\n')
@@ -603,8 +621,10 @@ func (m treePickerModel) renderRow(i int) string {
 func (m treePickerModel) renderSubheaderRow(row treeRow) string {
 	p := m.palette
 	style := lipgloss.NewStyle().Foreground(p.Muted).Italic(true)
-	// gridLeading - gridGutterW because gutter is added by renderRow.
-	return strings.Repeat(" ", gridLeading-gridGutterW) + style.Render(row.label)
+	// 2-col indent matches the tool-row nesting offset, plus the
+	// gridLeading-gridGutterW padding so the label aligns with the
+	// NAME column above the rows it introduces.
+	return "  " + strings.Repeat(" ", gridLeading-gridGutterW) + style.Render(row.label)
 }
 
 // renderBundleRow uses the strict shared grid:
@@ -724,8 +744,12 @@ func (m treePickerModel) renderToolRow(row treeRow) string {
 	}
 	src := lipgloss.NewStyle().Foreground(srcColor).Render(tool.Source)
 
+	// 2-col indent telegraphs nesting under the parent bundle. Without
+	// it, tool rows aligned flush with bundle rows and the
+	// parent/child relationship was visually invisible.
+	indent := "  "
 	// box + space + connector + space + name + gap + current + space + src
-	return box + " " + connector + " " + nameCol +
+	return indent + box + " " + connector + " " + nameCol +
 		strings.Repeat(" ", gridGap) + currentCol + " " + src
 }
 
