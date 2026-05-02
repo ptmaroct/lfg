@@ -31,6 +31,7 @@ const (
 // scattering Primary into body content; it loses signal value.
 // Gradient is reserved for the title hero block on welcome only.
 type Palette struct {
+	Name     ThemeName              // active theme identifier — surfaced in header
 	Bg       lipgloss.TerminalColor // usually NoColor — let terminal show through
 	Panel    lipgloss.TerminalColor // usually NoColor
 	Primary  lipgloss.TerminalColor
@@ -70,16 +71,17 @@ func gradientColors(p Palette) []lipgloss.Color {
 // Mid-gray neutrals used by every theme. Picked from the readable-on-
 // both-bgs band: dark enough to show on white, light enough on black.
 //
-//	muted   = #8A8A95  reads as ~50% on both bgs (info text)
-//	subtle  = #707080  one notch dimmer (secondary info)
-//	hairline= #5A5A66  rule lines, low-attention chrome
+//	muted   = #9CA3AF  reads as ~55% on both bgs (info text)
+//	subtle  = #828894  secondary info, still visible on dark
+//	hairline= #6E7280  rule lines — bumped from #5A5A66 which was
+//	                   nearly invisible on near-black terminal bgs
 //
-// Don't go below ~#505050 — everything past that disappears on dark.
-// Don't go above ~#A0A0A0 — washes out on light.
+// Don't go below ~#606060 — everything past that disappears on dark.
+// Don't go above ~#A8A8A8 — washes out on light.
 var (
-	neutralMuted    = lipgloss.Color("#8A8A95")
-	neutralSubtle   = lipgloss.Color("#707080")
-	neutralHairline = lipgloss.Color("#5A5A66")
+	neutralMuted    = lipgloss.Color("#9CA3AF")
+	neutralSubtle   = lipgloss.Color("#828894")
+	neutralHairline = lipgloss.Color("#6E7280")
 )
 
 // PaletteFor returns the palette for a theme name. Default = LFG.
@@ -89,6 +91,16 @@ var (
 // black without retuning. Text/Bg/Panel stay NoColor so the terminal's
 // own scheme drives those.
 func PaletteFor(name ThemeName) Palette {
+	p := paletteFor(name)
+	if name == "" {
+		p.Name = ThemeLFG
+	} else {
+		p.Name = name
+	}
+	return p
+}
+
+func paletteFor(name ThemeName) Palette {
 	switch name {
 	case ThemeColorblind:
 		// IBM colorblind-safe scheme. Blue + orange + magenta — no

@@ -11,7 +11,8 @@ import (
 // welcomeModel — first-screen entry. Custom render (not huh) so we can
 // place the animated logo hero AND the numbered action list in one
 // composition. The logo gradient sweeps via a tick-driven `phase`
-// counter (~80 ms cadence, 5 columns per tick visual feel).
+// counter (~220 ms cadence — calm, joyful breathing pace, ~10 s full
+// cycle. Fast sweeps on saturated hues felt strobe-y).
 type welcomeModel struct {
 	palette Palette
 	cursor  int
@@ -30,7 +31,7 @@ type welcomeChoice struct {
 type logoTickMsg struct{}
 
 func logoTickCmd() tea.Cmd {
-	return tea.Tick(80*time.Millisecond, func(time.Time) tea.Msg {
+	return tea.Tick(220*time.Millisecond, func(time.Time) tea.Msg {
 		return logoTickMsg{}
 	})
 }

@@ -113,10 +113,19 @@ func findToolInBundles(bundles []preset.Bundle, bundleID, toolName string) prese
 
 func (m *treePickerModel) rebuildRows() {
 	m.rows = m.rows[:0]
+	nodeOK := m.nodeAvailable()
 	for _, b := range m.bundles {
 		m.rows = append(m.rows, treeRow{kind: "bundle", bundleID: b.ID})
 		if !m.expanded[b.ID] {
 			continue
+		}
+		// Skills section is gated on node — surface why before listing
+		// tools so users understand the disabled state.
+		if b.ID == "skills" && !nodeOK {
+			m.rows = append(m.rows, treeRow{
+				kind: "subheader", bundleID: b.ID,
+				label: "REQUIRES node-lts — select it in barebones first",
+			})
 		}
 		// Split tools into to-install and already-installed groups so
 		// the user sees them as two distinct sections, not one mixed
@@ -222,6 +231,12 @@ func (m *treePickerModel) toggleAtCursor() {
 	if row.kind == "subheader" {
 		return
 	}
+	// Skills bundle requires node-lts. Block toggling until node is
+	// either already installed or queued in the install set; otherwise
+	// `npx skills add` won't have a runtime to execute.
+	if row.bundleID == "skills" && !m.nodeAvailable() {
+		return
+	}
 	if row.kind == "tool" {
 		tool := m.findTool(row.bundleID, row.toolName)
 		if tool.Installed || tool.Mandatory {
@@ -242,6 +257,27 @@ func (m *treePickerModel) toggleAtCursor() {
 		}
 		m.selected[bundle.ID+"/"+t.Name] = target
 	}
+}
+
+// nodeAvailable reports whether node-lts is installed on the host or
+// queued in the current selection set. Skills install via `npx skills
+// add`, so node has to be in the user's path by the time the skills
+// step runs.
+func (m treePickerModel) nodeAvailable() bool {
+	for _, b := range m.bundles {
+		for _, t := range b.Tools {
+			if t.Name != "node-lts" {
+				continue
+			}
+			if t.Installed {
+				return true
+			}
+			if m.selected[b.ID+"/"+t.Name] {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (m treePickerModel) findBundle(id string) preset.Bundle {

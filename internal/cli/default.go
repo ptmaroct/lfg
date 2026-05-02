@@ -2,7 +2,10 @@ package cli
 
 import (
 	"fmt"
+	"log"
 	"os"
+	"path/filepath"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -15,6 +18,20 @@ import (
 // program. Called from rootCmd.RunE when no subcommand is given.
 func runTUI() error {
 	applyBg()
+
+	// Debug logging: when --debug is set, redirect stdlib log + bubbletea
+	// internal log into a timestamped file under the lfg config dir. Path
+	// is printed on stderr both at startup and exit so it's discoverable
+	// even when the alt-screen takes over the terminal.
+	logPath, closeLog, err := openDebugLog()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "lfg: debug log setup failed:", err)
+	}
+	if closeLog != nil {
+		defer closeLog()
+		fmt.Fprintln(os.Stderr, "lfg: debug log →", logPath)
+	}
+
 	theme, fromFlag := resolveTheme()
 
 	// Persist theme on first run / when --theme is used so subsequent
@@ -60,5 +77,35 @@ func runTUI() error {
 		s.Theme = string(m.Theme())
 		_ = state.Save(s)
 	}
+
+	if logPath != "" {
+		fmt.Fprintln(os.Stderr, "lfg: debug log saved →", logPath)
+	}
 	return nil
+}
+
+// openDebugLog wires stdlib log → ~/.config/lfg/logs/debug-<ts>.log when
+// --debug is set. Returns the resolved path + a close func; when --debug
+// is off both are zero-valued.
+func openDebugLog() (string, func() error, error) {
+	if !debugFlag {
+		return "", nil, nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", nil, fmt.Errorf("home dir: %w", err)
+	}
+	dir := filepath.Join(home, ".config", "lfg", "logs")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", nil, fmt.Errorf("mkdir %s: %w", dir, err)
+	}
+	path := filepath.Join(dir, fmt.Sprintf("debug-%s.log", time.Now().Format("20060102-150405")))
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		return "", nil, fmt.Errorf("open %s: %w", path, err)
+	}
+	log.SetOutput(f)
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds | log.Lshortfile)
+	log.Printf("lfg debug log opened (pid=%d)", os.Getpid())
+	return path, f.Close, nil
 }

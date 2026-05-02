@@ -146,9 +146,9 @@ func All() []Bundle {
 			Tools: []Tool{
 				{
 					Name: "agent-browser", Source: "skills",
-					Description: "Headless-browser agent skill",
-					Homepage:    "https://github.com/anthropics/skills/tree/main/agent-browser",
-					SkillURL:    "https://github.com/anthropics/skills/tree/main/agent-browser",
+					Description: "vercel-labs/agent-browser — headless-browser agent skill",
+					Homepage:    "https://github.com/vercel-labs/agent-browser",
+					SkillURL:    "https://github.com/vercel-labs/agent-browser",
 				},
 				{
 					Name: "frontend-design", Source: "skills",

@@ -39,6 +39,11 @@ var configFlag string
 // the OSC-11 query), we fall back to dark — dev terminals skew dark.
 var bgFlag string
 
+// debugFlag enables verbose logging to ~/.config/lfg/logs/debug-<ts>.log.
+// Path is printed on stderr at startup and on exit so it's easy to pipe
+// into a viewer while iterating in a docker container.
+var debugFlag bool
+
 // rootCmd is the top-level `lfg` command.
 var rootCmd = &cobra.Command{
 	Use:   "lfg",
@@ -72,6 +77,8 @@ func init() {
 		"preset file (local path or http(s) URL); defaults to the built-in preset")
 	rootCmd.PersistentFlags().StringVar(&bgFlag, "bg", "auto",
 		"terminal background: auto, dark, light (or set LFG_BG)")
+	rootCmd.PersistentFlags().BoolVar(&debugFlag, "debug", false,
+		"verbose logging to ~/.config/lfg/logs/debug-<ts>.log")
 }
 
 // applyBg resolves --bg / $LFG_BG / auto-detect into a single

@@ -259,6 +259,7 @@ make widths          # static PNGs per width (needs `freeze`)
 make demo            # animated gif (needs `vhs`)
 make docker          # build container image (Ubuntu + linuxbrew)
 make docker-run      # launch TUI in container
+make docker-shell    # blank Ubuntu shell, `lfg` on PATH
 make release-snapshot  # local goreleaser build of all 4 targets (no upload)
 ```
 
@@ -273,64 +274,61 @@ goldens are clean ANSI-stripped text — diffable in any review tool.
 
 ### Testing on a fresh Linux box (Docker)
 
-End-to-end smoke testing on a clean machine — no leftover dotfiles, no
-brew already on the host, no installed AI CLIs to skew detect. The
-included `Dockerfile` builds Ubuntu 24.04 + linuxbrew + the lfg binary.
+Smoke-test on a clean machine — no leftover dotfiles, no brew on host,
+no AI CLIs skewing detect. `Dockerfile` builds Ubuntu 24.04 + linuxbrew
++ the `lfg` binary.
 
-**One-shot run** (rebuild image and launch the TUI inside):
+**Build once** (slow, ~2 min — pulls ubuntu base + installs brew):
 
 ```sh
-make docker         # builds the image (slow first time, ~1.05 GB)
-make docker-run     # launches ./lfg inside an interactive container
+make docker
 ```
 
-**Iterate without rebuilding** — mount the source in and use the
-official Go image. Edits on your host show up immediately:
+After source edits, re-run `make docker`. Layer cache keeps the rebuild
+fast (~10 s — only the Go-build + COPY layers re-run).
+
+**Two ways to use the image:**
 
 ```sh
-docker run --rm -it \
-  -v "$PWD":/app -w /app \
-  golang:1.26-bookworm \
-  bash -lc 'go run ./cmd/lfg'
+make docker-run      # launches ./lfg directly inside the container
+make docker-shell    # drops into bash; `lfg` already on PATH, type it to launch
 ```
 
-**Verify a custom preset end-to-end**:
+`docker-shell` is the one to use when you want to poke around the
+container, run `lfg` multiple times, or inspect filesystem state
+between runs.
+
+**Verify a custom preset end-to-end** — serve preset from host, point
+container at it:
 
 ```sh
-# in one terminal: serve the preset over HTTP
+# terminal 1
 python3 -m http.server 8000 --directory testdata
 
-# in another: run lfg inside the container with --config pointed at the host
-docker run --rm -it --network host \
-  -v "$PWD":/app -w /app \
-  golang:1.26-bookworm \
-  bash -lc 'go run ./cmd/lfg --config http://localhost:8000/sample-preset.toml'
+# terminal 2
+docker run --rm -it --network host lfg lfg --config http://localhost:8000/sample-preset.toml
 ```
 
-**Reset state between runs** — the container is `--rm` so its
-filesystem is discarded, but if you mount the source you may want to
-also wipe the persistent `~/.config/lfg/`:
-
-```sh
-docker run --rm -it \
-  -v "$PWD":/app -w /app \
-  -v lfg-config:/root/.config/lfg \
-  golang:1.26-bookworm bash -lc 'go run ./cmd/lfg'
-
-docker volume rm lfg-config   # nuke between runs for a truly clean state
-```
+**Reset state** — container is `--rm`, filesystem dies on exit. Each
+`make docker-shell` = fresh `~/.config/lfg/`. Nothing persists unless
+you mount a volume.
 
 **What to verify in the clean container**:
 
-1. Welcome screen shows 4 menu items (Install / Load config / Backup / Quit).
+1. Welcome screen shows 5 menu items (Install / Load config / Export /
+   Backup / Quit).
 2. Tree picker: empty `[ ]` clearly visible; `brew` row in `barebones`
    shows `[●]` (mandatory, can't toggle off).
 3. Confirm screen has labelled `CURRENT` + `VIA` columns.
 4. Skill detection: pre-create `~/.agents/skills/agent-browser/SKILL.md`
-   inside the container and re-run lfg — the skill should now show
-   installed in the tree picker.
-5. Failed install pauses on the screen with the log path printed; the
-   transcript lives at `~/.config/lfg/logs/install-*.log`.
+   inside the container and re-run `lfg` — skill should show installed.
+5. Failed install pauses on the screen with the log path printed;
+   transcript at `~/.config/lfg/logs/install-*.log`.
+
+> **Note**: this image pre-installs Homebrew, so it tests the
+> `brew install <pkg>` path but not lfg's brew bootstrap (installing
+> brew when missing). For that, build a bare image without the brew
+> RUN step.
 
 ## Roadmap
 
