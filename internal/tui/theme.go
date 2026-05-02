@@ -174,25 +174,28 @@ func paletteFor(name ThemeName) Palette {
 			},
 		}
 	default: // ThemeLFG
-		// Mid-luminance vivid palette. Each accent picked to clear the
-		// ~5:1 contrast bar against BOTH white and black so they don't
-		// wash out on light terminals or vanish on dark ones. Hot-pink
-		// brand identity preserved, but pulled darker (#E91E63) than
-		// the original #FF5FD9 which faded into pastel on white bg.
+		// Bright-on-dark palette. Earlier iteration used pink-500
+		// (#E91E63) and violet-600 (#7C3AED) which scored ~3:1 against
+		// near-black terminals — small "01" digits + `▸` cursor at
+		// body weight came out near-invisible (reported repeatedly).
+		// Pulled each accent up two Tailwind shade stops (-400) for a
+		// flat ~5:1 against black; still readable on white because
+		// surfaces that use Primary are bold (cursor, headers, focused
+		// buttons) and the hue shift is small.
 		return Palette{
 			Bg: lipgloss.NoColor{}, Panel: lipgloss.NoColor{}, Text: neutralText,
-			Primary:  lipgloss.Color("#E91E63"), // pink-500
-			Accent:   lipgloss.Color("#7C3AED"), // violet-600
-			Success:  lipgloss.Color("#059669"), // emerald-600
-			Warn:     lipgloss.Color("#D97706"), // amber-600
-			Error:    lipgloss.Color("#DC2626"), // red-600
+			Primary:  lipgloss.Color("#F472B6"), // pink-400
+			Accent:   lipgloss.Color("#A78BFA"), // violet-400
+			Success:  lipgloss.Color("#34D399"), // emerald-400
+			Warn:     lipgloss.Color("#FBBF24"), // amber-400
+			Error:    lipgloss.Color("#F87171"), // red-400
 			Muted:    neutralMuted,
 			Subtle:   neutralSubtle,
 			Hairline: neutralHairline,
 			Gradient: []lipgloss.TerminalColor{
-				lipgloss.Color("#E91E63"),
-				lipgloss.Color("#7C3AED"),
-				lipgloss.Color("#059669"),
+				lipgloss.Color("#F472B6"),
+				lipgloss.Color("#A78BFA"),
+				lipgloss.Color("#34D399"),
 			},
 		}
 	}

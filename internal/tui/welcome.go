@@ -156,8 +156,13 @@ func (m welcomeModel) renderChoice(i int, c welcomeChoice, contentW int) string 
 	descStyle := lipgloss.NewStyle().Foreground(p.Muted).Italic(true)
 
 	if i == m.cursor {
+		// Cursor stays Primary for accent identity. Number flips to Text
+		// bold (high contrast) instead of Primary — colored small digits
+		// on dark bgs read dim because mid-saturation hues lose
+		// luminance vs. plain bright text. Title stays Primary so the
+		// row's selection signal is unmistakable.
 		gutter = lipgloss.NewStyle().Foreground(p.Primary).Bold(true).Render("▸ ")
-		num = lipgloss.NewStyle().Foreground(p.Primary).Bold(true).Render("0" + sprint1(i+1))
+		num = lipgloss.NewStyle().Foreground(p.Text).Bold(true).Render("0" + sprint1(i+1))
 		titleStyle = titleStyle.Foreground(p.Primary)
 	}
 
