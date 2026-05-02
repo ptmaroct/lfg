@@ -351,7 +351,7 @@ func (m treePickerModel) Update(msg tea.Msg) (treePickerModel, tea.Cmd) {
 				}
 			}
 			return m, goToWithTools(screenConfirm, tools)
-		case "esc":
+		case "esc", "backspace", "delete":
 			return m, goTo(screenWelcome)
 		}
 		if m.cursor < m.offset {

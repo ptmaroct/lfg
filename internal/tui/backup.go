@@ -139,7 +139,8 @@ func (m backupModel) Update(msg tea.Msg) (backupModel, tea.Cmd) {
 	case tea.KeyMsg:
 		switch m.step {
 		case 0:
-			if msg.String() == "esc" {
+			switch msg.String() {
+			case "esc", "backspace", "delete":
 				return m, goTo(screenWelcome)
 			}
 		case 2, 3:
@@ -207,15 +208,9 @@ func (m backupModel) View(width, height int) string {
 		b.WriteString(SectionLabel(p, "Backup ready", "", contentW))
 		b.WriteString("\n\n")
 		check := lipgloss.NewStyle().Foreground(p.Success).Bold(true).Render("●")
-		path := lipgloss.NewStyle().
-			Foreground(p.Primary).
-			Bold(true).
-			Border(lipgloss.NormalBorder()).
-			BorderForeground(p.Subtle).
-			Padding(0, 2).
-			Render(m.filepath)
-		b.WriteString("  " + check + "  saved to:\n\n")
-		b.WriteString("  " + path + "\n\n")
+		path := lipgloss.NewStyle().Foreground(p.Primary).Bold(true).Render(m.filepath)
+		b.WriteString("  " + check + "  saved to:\n")
+		b.WriteString("       " + path + "\n\n")
 
 		stats := fmt.Sprintf("%d files · %s",
 			m.result.Files, humanize.Bytes(uint64(m.result.Bytes)))

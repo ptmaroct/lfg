@@ -40,7 +40,8 @@ func (m configInputModel) Init() tea.Cmd { return textinput.Blink }
 func (m configInputModel) Update(msg tea.Msg) (configInputModel, tea.Cmd) {
 	if k, ok := msg.(tea.KeyMsg); ok {
 		switch k.String() {
-		case "esc":
+		case "esc", "delete":
+			// backspace stays on the textinput for editing.
 			return m, goTo(screenWelcome)
 		case "enter":
 			spec := strings.TrimSpace(m.input.Value())

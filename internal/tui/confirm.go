@@ -73,7 +73,7 @@ func (m confirmModel) Init() tea.Cmd { return m.form.Init() }
 func (m confirmModel) Update(msg tea.Msg) (confirmModel, tea.Cmd) {
 	if k, ok := msg.(tea.KeyMsg); ok {
 		switch k.String() {
-		case "esc":
+		case "esc", "backspace", "delete":
 			return m, goTo(screenTree)
 		case "i", "I":
 			return m, goTo(screenProgress)
@@ -178,7 +178,7 @@ func renderStatCells(p Palette, contentW int, cells []statCell) string {
 		)
 		box := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(p.Subtle).
+			BorderForeground(p.Muted). // visible on both light + dark bg
 			Padding(0, 1).
 			Width(cellW - 2).
 			Render(body)

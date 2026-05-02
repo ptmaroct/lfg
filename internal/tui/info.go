@@ -29,7 +29,7 @@ func (m infoModel) Init() tea.Cmd { return nil }
 func (m infoModel) Update(msg tea.Msg) (infoModel, tea.Cmd) {
 	if k, ok := msg.(tea.KeyMsg); ok {
 		switch k.String() {
-		case "esc", "enter", "i", "I", " ":
+		case "esc", "enter", "i", "I", " ", "backspace", "delete":
 			return m, func() tea.Msg { return closeInfoMsg{} }
 		}
 	}
@@ -119,10 +119,7 @@ func (m infoModel) View(width, height int) string {
 	return Frame(p, width, height,
 		"info · "+m.tool.Name,
 		b.String(),
-		HintLine(p,
-			KeyHint(p, "⏎", "back"),
-			KeyHint(p, "⎋", "back"),
-		),
+		HintLine(p, KeyHint(p, "⏎ ⎋ I", "back")),
 		height < 22,
 	)
 }

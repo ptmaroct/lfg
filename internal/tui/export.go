@@ -52,7 +52,9 @@ func (m exportModel) Init() tea.Cmd { return textinput.Blink }
 func (m exportModel) Update(msg tea.Msg) (exportModel, tea.Cmd) {
 	if k, ok := msg.(tea.KeyMsg); ok {
 		switch k.String() {
-		case "esc":
+		case "esc", "delete":
+			// Note: backspace is reserved for the textinput's delete-prev
+			// when not yet saved. Use Esc / Delete to back out.
 			return m, goTo(screenWelcome)
 		case "enter":
 			if m.saved {
@@ -99,15 +101,9 @@ func (m exportModel) View(width, height int) string {
 		b.WriteString(SectionLabel(p, "Preset saved", "", contentW))
 		b.WriteString("\n\n")
 		check := lipgloss.NewStyle().Foreground(p.Success).Bold(true).Render("●")
-		path := lipgloss.NewStyle().
-			Foreground(p.Primary).
-			Bold(true).
-			Border(lipgloss.NormalBorder()).
-			BorderForeground(p.Subtle).
-			Padding(0, 2).
-			Render(m.savedAt)
-		b.WriteString("  " + check + "  saved to:\n\n")
-		b.WriteString("  " + path + "\n\n")
+		path := lipgloss.NewStyle().Foreground(p.Primary).Bold(true).Render(m.savedAt)
+		b.WriteString("  " + check + "  saved to:\n")
+		b.WriteString("       " + path + "\n\n")
 		b.WriteString("  " + lipgloss.NewStyle().Foreground(p.Text).Bold(true).
 			Render("What's next") + "\n")
 		next := lipgloss.NewStyle().Foreground(p.Muted)

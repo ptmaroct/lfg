@@ -87,7 +87,7 @@ func (m welcomeModel) Update(msg tea.Msg) (welcomeModel, tea.Cmd) {
 			}
 		case "enter":
 			return m, goTo(m.choices[m.cursor].action)
-		case "esc":
+		case "esc", "backspace", "delete":
 			return m, goTo(screenQuitConfirm)
 		case "1", "2", "3", "4", "5":
 			idx := int(msg.String()[0] - '1')
