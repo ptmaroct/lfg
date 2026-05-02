@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,13 +28,7 @@ func (m doneModel) Update(msg tea.Msg) (doneModel, tea.Cmd) {
 
 func (m doneModel) View(width, height int) string {
 	p := m.palette
-	canvasW := width - 4
-	if canvasW > 100 {
-		canvasW = 100
-	}
-	if canvasW < 56 {
-		canvasW = 56
-	}
+	canvasW := CanvasW(width)
 	contentW := canvasW - 4
 
 	var b strings.Builder
@@ -92,16 +87,37 @@ func (m doneModel) View(width, height int) string {
 
 // reloadShellCmd returns the literal command the user should run to
 // pick up the rc changes lfg just wrote. We can't reload the parent
-// shell from a child process — POSIX env doesn't allow it — so we hand
-// back the most idiomatic command for the detected shell instead.
+// shell from a child process (POSIX doesn't expose that) so the
+// command must replace the parent shell with a fresh login shell of
+// the same kind.
+//
+// Detection priority:
+//  1. $SHELL env var — set by every well-behaved shell at startup
+//  2. parent process name via /proc/<ppid>/comm — covers
+//     `docker run -it bash` where $SHELL stays unset
+//  3. generic `exec "$SHELL" -l` so the user's own shell expands the
+//     variable at runtime
+//
+// We deliberately drop the `-l` (login) flag for bash/zsh: login mode
+// on Linux sources ~/.bash_profile (or ~/.profile / ~/.zprofile), NOT
+// ~/.bashrc / ~/.zshrc — but our shellrc.go writes the PATH block to
+// the interactive rc, so a login-shell exec wouldn't pick it up. Plain
+// `exec bash` / `exec zsh` re-runs as interactive (since stdin is a
+// tty) and sources the right file.
 func reloadShellCmd() string {
 	shell := strings.ToLower(filepath.Base(os.Getenv("SHELL")))
+	if shell == "" || shell == "." {
+		if data, err := os.ReadFile(fmt.Sprintf("/proc/%d/comm", os.Getppid())); err == nil {
+			shell = strings.ToLower(strings.TrimSpace(string(data)))
+		}
+	}
 	switch {
 	case strings.Contains(shell, "fish"):
 		return "exec fish"
-	case strings.Contains(shell, "bash"):
-		return "exec bash -l"
-	default:
+	case strings.Contains(shell, "zsh"):
 		return "exec zsh"
+	case strings.Contains(shell, "bash"):
+		return "exec bash"
 	}
+	return `exec "$SHELL"`
 }

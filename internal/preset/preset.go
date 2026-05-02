@@ -24,6 +24,101 @@ type Tool struct {
 	// Mandatory rows can't be unselected in the tree picker. Used for
 	// hard dependencies like Homebrew that other tools build on.
 	Mandatory bool `toml:"mandatory,omitempty"`
+	// PostInstall lists shell commands to run sequentially after the
+	// main install step succeeds. Useful when a tool needs runtime
+	// prerequisites the primary installer doesn't cover (e.g.
+	// agent-browser ships as a skill stub but needs `npm i -g
+	// agent-browser` + `agent-browser install` to actually function).
+	// Each line runs through the same exec path as the main install
+	// so output streams into the live log + transcript file.
+	PostInstall []string `toml:"post_install,omitempty"`
+}
+
+// PlannedVersion returns the version string lfg will install for this
+// tool, parsed from its install command. Three patterns:
+//
+//   - mise/npm style ending in `@<ver>` → returns the literal token
+//     ("lts", "latest", "20.11.0", etc.)
+//   - known package-manager sources without an explicit @ver → "latest"
+//     (brew, mise, npm, cask)
+//   - everything else (curl scripts, skill stubs, custom) → "" so the
+//     caller can fall back to "—"
+//
+// Cheap and parser-only — no network. Trades exactness for instant
+// render; an authoritative version would need a registry lookup per
+// tool which would freeze the tree picker on every open.
+func (t Tool) PlannedVersion() string {
+	cmd := t.InstallMac
+	if cmd == "" {
+		cmd = t.InstallLinux
+	}
+	if cmd != "" {
+		// Match the LAST `@token` not preceded by `/` so we skip npm
+		// scoped packages like `@openai/codex` and only catch the
+		// version pin (`node@lts`, `pnpm@latest`, `node@20.11.0`).
+		// Right-to-left scan keeps the regex simple.
+		fields := splitCmd(cmd)
+		for i := len(fields) - 1; i >= 0; i-- {
+			f := fields[i]
+			if at := lastAt(f); at > 0 && f[at-1] != '/' {
+				v := f[at+1:]
+				v = trimTrailingPunct(v)
+				if v != "" {
+					return v
+				}
+			}
+		}
+	}
+	switch t.Source {
+	case "brew", "cask", "mise", "npm":
+		return "latest"
+	}
+	return ""
+}
+
+// splitCmd splits on whitespace + pipe so a piped install (`curl ... |
+// sh`) is tokenized. Avoids importing strings here to keep the file
+// self-contained — adapted-Fields.
+func splitCmd(s string) []string {
+	out := []string{}
+	cur := []byte{}
+	flush := func() {
+		if len(cur) > 0 {
+			out = append(out, string(cur))
+			cur = cur[:0]
+		}
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c == ' ' || c == '\t' || c == '|' || c == '\n' {
+			flush()
+			continue
+		}
+		cur = append(cur, c)
+	}
+	flush()
+	return out
+}
+
+func lastAt(s string) int {
+	for i := len(s) - 1; i >= 0; i-- {
+		if s[i] == '@' {
+			return i
+		}
+	}
+	return -1
+}
+
+func trimTrailingPunct(s string) string {
+	for len(s) > 0 {
+		c := s[len(s)-1]
+		if c == '"' || c == '\'' || c == ',' || c == ')' || c == '}' {
+			s = s[:len(s)-1]
+			continue
+		}
+		break
+	}
+	return s
 }
 
 // Bundle is a named group of tools the user can toggle on/off.
@@ -149,6 +244,16 @@ func All() []Bundle {
 					Description: "vercel-labs/agent-browser — headless-browser agent skill",
 					Homepage:    "https://github.com/vercel-labs/agent-browser",
 					SkillURL:    "https://github.com/vercel-labs/agent-browser",
+					// The skill stub from `npx skills add` is just a
+					// SKILL.md pointer; the actual `agent-browser`
+					// binary + Chrome download are installed by the
+					// two commands below. Without them the skill loads
+					// but `agent-browser --version` fails with command
+					// not found.
+					PostInstall: []string{
+						"npm install -g agent-browser",
+						"agent-browser install",
+					},
 				},
 				{
 					Name: "frontend-design", Source: "skills",

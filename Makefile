@@ -1,5 +1,5 @@
 # lfg — build, test, snapshot, demo
-.PHONY: build run test snap snap-update widths demo docker docker-run docker-shell clean release release-snapshot
+.PHONY: build run test snap snap-update widths demo docker docker-run docker-shell docker-test clean release release-snapshot
 
 build:
 	go build -o lfg ./cmd/lfg
@@ -46,6 +46,14 @@ docker-run:
 docker-shell:
 	@docker image inspect lfg >/dev/null 2>&1 || $(MAKE) docker
 	docker run --rm -it --entrypoint bash lfg
+
+# One-shot test loop: rebuild image (so latest binary is baked), launch
+# fresh container, auto-run `lfg --debug`, drop into bash on exit so
+# the user can poke around (cat the install log, run the freshly
+# installed CLIs, etc.). Tightest iteration loop for end-to-end QA.
+docker-test:
+	docker build -t lfg .
+	docker run --rm -it --entrypoint bash lfg -lc 'lfg --debug; echo; echo "--- lfg exited; debug log + transcripts in ~/.config/lfg/logs/ ---"; exec bash'
 
 # Local snapshot release via goreleaser — builds all platforms into
 # ./dist/ without uploading anywhere. Useful for smoke-testing the

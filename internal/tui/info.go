@@ -43,13 +43,7 @@ type closeInfoMsg struct{}
 
 func (m infoModel) View(width, height int) string {
 	p := m.palette
-	canvasW := width - 4
-	if canvasW > 100 {
-		canvasW = 100
-	}
-	if canvasW < 56 {
-		canvasW = 56
-	}
+	canvasW := CanvasW(width)
 	contentW := canvasW - 4
 
 	label := lipgloss.NewStyle().Foreground(p.Muted).Bold(false)
@@ -116,10 +110,21 @@ func (m infoModel) View(width, height int) string {
 			Render(cmd) + "\n")
 	}
 
+	// PostInstall: list any commands that run after the main install.
+	// Useful for skills like agent-browser that need additional npm /
+	// chrome bootstrapping before they're functional.
+	if len(m.tool.PostInstall) > 0 {
+		b.WriteString("\n  " + label.Render("post-install") + "\n")
+		boxStyle := lipgloss.NewStyle().Foreground(p.Text).Background(p.Panel).Padding(0, 1)
+		for _, c := range m.tool.PostInstall {
+			b.WriteString("  " + boxStyle.Render(c) + "\n")
+		}
+	}
+
 	return Frame(p, width, height,
 		"info · "+m.tool.Name,
 		b.String(),
-		HintLine(p, KeyHint(p, "⎋", "back")),
+		HintLine(p, KeyHint(p, "ESC", "back")),
 		height < 22,
 	)
 }

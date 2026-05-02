@@ -131,13 +131,7 @@ func (m probeModel) Update(msg tea.Msg) (probeModel, tea.Cmd) {
 
 func (m probeModel) View(width, height int) string {
 	p := m.palette
-	canvasW := width - 4
-	if canvasW > 100 {
-		canvasW = 100
-	}
-	if canvasW < 56 {
-		canvasW = 56
-	}
+	canvasW := CanvasW(width)
 	contentW := canvasW - 4
 
 	pct := 0.0

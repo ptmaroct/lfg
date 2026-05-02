@@ -174,13 +174,7 @@ func (m backupModel) Update(msg tea.Msg) (backupModel, tea.Cmd) {
 
 func (m backupModel) View(width, height int) string {
 	p := m.palette
-	canvasW := width - 4
-	if canvasW > 100 {
-		canvasW = 100
-	}
-	if canvasW < 56 {
-		canvasW = 56
-	}
+	canvasW := CanvasW(width)
 	contentW := canvasW - 4
 
 	var b strings.Builder
@@ -260,7 +254,7 @@ func (m backupModel) View(width, height int) string {
 	hint := HintLine(p,
 		KeyHint(p, "←→", "switch"),
 		KeyHint(p, "⏎", "confirm"),
-		KeyHint(p, "⎋", "back"),
+		KeyHint(p, "ESC", "back"),
 	)
 	if m.step == 2 || m.step == 3 {
 		hint = HintLine(p, KeyHint(p, "any", "exit"))

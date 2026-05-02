@@ -82,13 +82,7 @@ func (m quitConfirmModel) View(width, height int) string {
 	// huh.Form view can be wider than canvasW, which makes
 	// lipgloss.Place center on the form's width (not the frame's) and
 	// the whole dialog drifts left in wide terminals.
-	canvasW := width - 4
-	if canvasW > 100 {
-		canvasW = 100
-	}
-	if canvasW < 56 {
-		canvasW = 56
-	}
+	canvasW := CanvasW(width)
 
 	// Center every line of the form view independently within canvasW so
 	// the title, description, and button row all sit on the canvas axis.
@@ -111,7 +105,7 @@ func (m quitConfirmModel) View(width, height int) string {
 		"confirm quit",
 		inner,
 		// No hint line — dialog buttons + Esc are self-explanatory.
-		HintLine(m.palette, KeyHint(m.palette, "⎋", "dismiss")),
+		HintLine(m.palette, KeyHint(m.palette, "ESC", "dismiss")),
 		height < 22,
 	)
 }

@@ -240,6 +240,33 @@ func Run(ctx context.Context, plan []Step, out chan<- Line) []FailedStep {
 		// Refresh PATH after the step in case it dropped a binary.
 		_ = os.Setenv("PATH", augmentedPath(originalPath))
 
+		// PostInstall: run each shell command sequentially after the
+		// main install succeeds. Used for runtime prerequisites the
+		// primary installer doesn't cover — e.g. agent-browser ships
+		// as a skill stub but needs `npm i -g agent-browser` + `agent-
+		// browser install` for the binary + Chrome bundle.
+		//
+		// Post-install steps are BEST EFFORT — a failure here (e.g.
+		// Chrome for Testing has no linux/arm64 build) does NOT taint
+		// the parent step's success. The main install (skill stub /
+		// brew install / etc) already landed; the user can re-run or
+		// patch manually. Surfacing post-install failures as full step
+		// failures would falsely red-flag tools that are actually 80%
+		// working, which is more confusing than a clear warning line.
+		if err == nil && !step.Bootstrap && len(step.Tool.PostInstall) > 0 {
+			for _, post := range step.Tool.PostInstall {
+				if ctx.Err() != nil {
+					break
+				}
+				out <- Line{Tool: key, Stream: "meta", Text: "post-install: " + post}
+				if perr := runCmd(ctx, step.Tool.Name, post, out); perr != nil {
+					out <- Line{Tool: key, Stream: "stderr",
+						Text: fmt.Sprintf("post-install warning: %s — %v (main install still succeeded)", post, perr)}
+				}
+				_ = os.Setenv("PATH", augmentedPath(originalPath))
+			}
+		}
+
 		errText := ""
 		if err != nil {
 			errText = err.Error()

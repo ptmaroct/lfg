@@ -18,13 +18,7 @@ import (
 // Inner widgets render their own internal hairline rules / tables;
 // Frame only owns the outer two strips.
 func Frame(p Palette, width, height int, subtitle, inner, footer string, compactTitle bool) string {
-	canvasW := width - 4
-	if canvasW > 100 {
-		canvasW = 100
-	}
-	if canvasW < 56 {
-		canvasW = 56
-	}
+	canvasW := CanvasW(width)
 
 	// Header strip: small brand mark + dot separator + crumb left, theme
 	// breadcrumb right. No big figlet hero — that's only on welcome
@@ -172,4 +166,26 @@ func KeyHint(p Palette, key, label string) string {
 func HintLine(p Palette, hints ...string) string {
 	sep := lipgloss.NewStyle().Foreground(p.Subtle).Render("  ")
 	return "  " + strings.Join(hints, sep)
+}
+
+// CanvasW is the SINGLE source of truth for inner-canvas width across
+// every screen. Was duplicated in 9 places — even with identical
+// formulas, having Frame and each screen compute independently meant
+// any future tweak (or a one-character typo) would silently desync
+// widths between screens. Centralizing here means screens visually
+// align across transitions, no surprise resize when stepping welcome
+// → tree → confirm → progress → done.
+//
+// Bounds: 56 min (anything below makes the welcome hero unreadable),
+// 100 max (wider than that bloats horizontal eye travel for a
+// terminal app and content has been tuned at 100 cols).
+func CanvasW(width int) int {
+	w := width - 4
+	if w > 100 {
+		w = 100
+	}
+	if w < 56 {
+		w = 56
+	}
+	return w
 }
