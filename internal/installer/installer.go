@@ -13,6 +13,7 @@ package installer
 import (
 	"context"
 	"fmt"
+	"os"
 	"runtime"
 	"strings"
 
@@ -100,9 +101,31 @@ func installCmd(t preset.Tool) string {
 // Plan turns selected tools into an ordered list of Steps with the
 // minimum bootstraps prepended. A backend appears as a bootstrap step
 // at most once.
+//
+// When a selected tool's name matches a bootstrap-able backend (e.g.
+// the user picked the `mise` tool, and `mise` is also a backend that
+// would otherwise self-bootstrap before its first dependent), we skip
+// the auto-bootstrap step — installing mise twice in one run was a
+// real bug seen in container testing where the explicit `mise` tool
+// install ran via curl and the auto-bootstrap then ran the same curl
+// again.
 func Plan(bundles []preset.Bundle, selected map[string]bool) []Step {
 	var steps []Step
 	seenBootstrap := map[string]bool{}
+
+	// Pre-scan: which bootstrap-capable backends are already covered by
+	// an explicit selected tool of the same name?
+	selfBootstrapped := map[string]bool{}
+	for _, b := range bundles {
+		for _, t := range b.Tools {
+			if !selected[b.ID+"/"+t.Name] {
+				continue
+			}
+			if needsBootstrap(t.Name) {
+				selfBootstrapped[t.Name] = true
+			}
+		}
+	}
 
 	for _, b := range bundles {
 		for _, t := range b.Tools {
@@ -114,8 +137,9 @@ func Plan(bundles []preset.Bundle, selected map[string]bool) []Step {
 			if _, ok := registry[backend]; !ok {
 				backend = "custom"
 			}
-			// Bootstrap once per backend that needs it.
-			if needsBootstrap(backend) && !seenBootstrap[backend] {
+			// Bootstrap once per backend that needs it AND isn't already
+			// being installed as an explicit tool earlier in the queue.
+			if needsBootstrap(backend) && !seenBootstrap[backend] && !selfBootstrapped[backend] {
 				steps = append(steps, Step{Backend: backend, Bootstrap: true})
 				seenBootstrap[backend] = true
 			}
@@ -152,7 +176,15 @@ func needsBootstrap(backend string) bool {
 // Where `key` is "<backend>" for bootstraps and "<bundle>/<tool>"
 // otherwise.
 func Run(ctx context.Context, plan []Step, out chan<- Line) []FailedStep {
+	// Augment PATH so commands run in step N see binaries dropped by
+	// step N-1 (e.g. mise → ~/.local/bin/mise). Restore on exit so we
+	// don't leak PATH changes back to the caller.
+	originalPath := os.Getenv("PATH")
+	_ = os.Setenv("PATH", augmentedPath(originalPath))
+	defer os.Setenv("PATH", originalPath)
+
 	var failed []FailedStep
+	failedBackends := map[string]bool{}
 	for _, step := range plan {
 		if ctx.Err() != nil {
 			break
@@ -165,6 +197,38 @@ func Run(ctx context.Context, plan []Step, out chan<- Line) []FailedStep {
 			failed = append(failed, FailedStep{Step: step, Err: fmt.Errorf("no installer for %q", step.Backend)})
 			continue
 		}
+
+		// Re-augment PATH each iteration in case a prior step landed a
+		// new binary into a directory we didn't have on PATH yet.
+		_ = os.Setenv("PATH", augmentedPath(originalPath))
+
+		// Skip-with-message when an upstream backend already failed
+		// (e.g. mise bootstrap failed, all mise-source tools should
+		// short-circuit instead of each one re-emitting the same
+		// "mise: not found" exit-127 line).
+		if !step.Bootstrap && failedBackends[step.Backend] {
+			out <- Line{Tool: key, Stream: "begin"}
+			msg := fmt.Sprintf("skipped — backend %q unavailable (upstream failed)", step.Backend)
+			out <- Line{Tool: key, Stream: "meta", Text: msg}
+			out <- Line{Tool: key, Stream: "end", Text: msg}
+			failed = append(failed, FailedStep{Step: step, Err: fmt.Errorf("%s", msg)})
+			continue
+		}
+
+		// Pre-check backend availability for non-bootstrap steps. Catches
+		// the case where the backend's binary isn't on PATH (e.g. npm /
+		// npx for skills before node is installed) without spending a
+		// whole exec to learn that.
+		if !step.Bootstrap && !i.Available() {
+			out <- Line{Tool: key, Stream: "begin"}
+			msg := fmt.Sprintf("skipped — %s not available on PATH (install its prerequisite first)", step.Backend)
+			out <- Line{Tool: key, Stream: "meta", Text: msg}
+			out <- Line{Tool: key, Stream: "end", Text: msg}
+			failedBackends[step.Backend] = true
+			failed = append(failed, FailedStep{Step: step, Err: fmt.Errorf("%s", msg)})
+			continue
+		}
+
 		out <- Line{Tool: key, Stream: "begin"}
 		var err error
 		if step.Bootstrap {
@@ -172,12 +236,29 @@ func Run(ctx context.Context, plan []Step, out chan<- Line) []FailedStep {
 		} else {
 			err = i.Install(ctx, step.Tool, out)
 		}
+
+		// Refresh PATH after the step in case it dropped a binary.
+		_ = os.Setenv("PATH", augmentedPath(originalPath))
+
 		errText := ""
 		if err != nil {
 			errText = err.Error()
 			failed = append(failed, FailedStep{Step: step, Err: err})
+			if step.Bootstrap {
+				// A failed bootstrap means every dependent in this run
+				// will also fail. Mark so we skip them with a clean msg.
+				failedBackends[step.Backend] = true
+			}
 		}
 		out <- Line{Tool: key, Stream: "end", Text: errText}
+	}
+
+	// Persist PATH augmentation into the user's shell rc so a fresh
+	// shell sees the new bins without manual `source`. Idempotent — re-
+	// runs replace the fenced block in place.
+	if rc, err := EnsureShellPath(); err == nil && rc != "" {
+		out <- Line{Tool: "shell", Stream: "meta",
+			Text: fmt.Sprintf("updated %s — reload your shell or run `exec $SHELL`", rc)}
 	}
 	return failed
 }

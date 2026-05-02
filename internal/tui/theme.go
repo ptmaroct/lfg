@@ -84,6 +84,17 @@ var (
 	neutralHairline = lipgloss.Color("#6E7280")
 )
 
+// neutralText is the body-copy foreground. We were using NoColor (let
+// terminal pick) but some terminals — particularly inside docker /
+// over ssh / under tmux + alt-screen — render the default fg as black
+// even on a dark bg, leaving body text invisible. Pinning an explicit
+// AdaptiveColor sidesteps the unreliable terminal-default lookup.
+//
+// Light bg → near-black for max contrast on white surfaces.
+// Dark bg  → near-white but pulled slightly off-pure so it doesn't
+//            scream against an OLED black; still > 12:1 contrast on #000.
+var neutralText = lipgloss.AdaptiveColor{Light: "#1F2937", Dark: "#E5E7EB"}
+
 // PaletteFor returns the palette for a theme name. Default = LFG.
 //
 // Each theme picks accent colors (Primary, Accent, Success, Warn, Error)
@@ -106,7 +117,7 @@ func paletteFor(name ThemeName) Palette {
 		// IBM colorblind-safe scheme. Blue + orange + magenta — no
 		// red/green pair. Source: davidmathlogic.com/colorblind/.
 		return Palette{
-			Bg: lipgloss.NoColor{}, Panel: lipgloss.NoColor{}, Text: lipgloss.NoColor{},
+			Bg: lipgloss.NoColor{}, Panel: lipgloss.NoColor{}, Text: neutralText,
 			Primary:  lipgloss.Color("#3B82F6"), // blue
 			Accent:   lipgloss.Color("#A78BFA"), // purple
 			Success:  lipgloss.Color("#0EA5E9"), // sky (avoid green confusion)
@@ -126,7 +137,7 @@ func paletteFor(name ThemeName) Palette {
 		// dark bg only — pulled toward darker variants so they read on
 		// white too without losing the purple/pink identity.
 		return Palette{
-			Bg: lipgloss.NoColor{}, Panel: lipgloss.NoColor{}, Text: lipgloss.NoColor{},
+			Bg: lipgloss.NoColor{}, Panel: lipgloss.NoColor{}, Text: neutralText,
 			Primary:  lipgloss.Color("#D63384"), // pink (darkened from #FF79C6)
 			Accent:   lipgloss.Color("#7048E8"), // violet (darkened from #BD93F9)
 			Success:  lipgloss.Color("#2EA043"), // green (darkened from #50FA7B)
@@ -146,7 +157,7 @@ func paletteFor(name ThemeName) Palette {
 		// Mid-luminance Catppuccin Mocha-flavored. Pastels darkened
 		// enough to read on white without washing out.
 		return Palette{
-			Bg: lipgloss.NoColor{}, Panel: lipgloss.NoColor{}, Text: lipgloss.NoColor{},
+			Bg: lipgloss.NoColor{}, Panel: lipgloss.NoColor{}, Text: neutralText,
 			Primary:  lipgloss.Color("#D02A8A"), // pink (darkened from #F5C2E7)
 			Accent:   lipgloss.Color("#7C3FBF"), // mauve (darkened from #CBA6F7)
 			Success:  lipgloss.Color("#1F7C3D"), // green (darkened from #A6E3A1)
@@ -169,7 +180,7 @@ func paletteFor(name ThemeName) Palette {
 		// brand identity preserved, but pulled darker (#E91E63) than
 		// the original #FF5FD9 which faded into pastel on white bg.
 		return Palette{
-			Bg: lipgloss.NoColor{}, Panel: lipgloss.NoColor{}, Text: lipgloss.NoColor{},
+			Bg: lipgloss.NoColor{}, Panel: lipgloss.NoColor{}, Text: neutralText,
 			Primary:  lipgloss.Color("#E91E63"), // pink-500
 			Accent:   lipgloss.Color("#7C3AED"), // violet-600
 			Success:  lipgloss.Color("#059669"), // emerald-600
