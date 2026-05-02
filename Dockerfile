@@ -14,12 +14,15 @@ RUN CGO_ENABLED=0 go build -o /out/lfg ./cmd/lfg
 
 FROM ubuntu:24.04
 
-# INCLUDE_BREW toggles whether linuxbrew is preinstalled.
-#   1 (default) — fast iteration; brew shows under ALREADY INSTALLED.
-#   0           — bare ubuntu; lfg's brew bootstrap path is exercised
-#                 fully (slow, but tests the real flow).
-# Override per-build:  docker build --build-arg INCLUDE_BREW=0 -t lfg-bare .
-ARG INCLUDE_BREW=1
+# NOTE: INCLUDE_BREW is declared LATER, just before the brew RUN. We
+# deliberately don't `ARG` it here at the top of the stage because
+# BuildKit folds every in-scope ARG value into the cache key of every
+# subsequent RUN — even ones that don't reference the ARG. Putting it
+# at the top meant `make docker-bare` (INCLUDE_BREW=0) and `make
+# docker` (INCLUDE_BREW=1) produced different cache keys for the
+# expensive apt-get + useradd layers, forcing 2-min full rebuilds on
+# every variant switch. Declaring it later lets the apt + user layers
+# share cache across both build variants.
 
 # Brew prerequisites + general dev basics. `procps` ships `ps` which the
 # Homebrew installer probes; `file` is also required even when we skip
@@ -46,11 +49,15 @@ RUN useradd -m -s /bin/bash dev \
 USER dev
 WORKDIR /home/dev
 
-# Conditional brew install. ARG re-declared inside the build stage so
-# the RUN below can read it; otherwise the global ARG is invisible to
-# this stage. NONINTERACTIVE=1 is also conditional so a bare image
-# doesn't carry a misleading homebrew env var.
-ARG INCLUDE_BREW
+# INCLUDE_BREW toggles whether linuxbrew is preinstalled.
+#   1 (default) — fast iteration; brew shows under ALREADY INSTALLED.
+#   0           — bare ubuntu; lfg's brew bootstrap path is exercised.
+# Override per-build:  docker build --build-arg INCLUDE_BREW=0 -t lfg-bare .
+#
+# Declared HERE (not at top of stage) so it only affects this RUN's
+# cache key, not the apt + useradd layers above. Lets a brewed and a
+# bare build share the heavy ubuntu setup.
+ARG INCLUDE_BREW=1
 RUN if [ "$INCLUDE_BREW" = "1" ]; then \
         export NONINTERACTIVE=1 && \
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" && \

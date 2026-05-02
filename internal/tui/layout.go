@@ -8,17 +8,23 @@ import (
 
 // Frame is the outer chrome applied to every screen.
 //
-// Aesthetic: tactical bulletin with anchored corners. Heavy corner glyphs
-// (┏ ┓ ┗ ┛) bracket the top and bottom rules so the chrome reads as a
-// container without verticals (verticals on every line break centering).
-// Header strip = brand mark + breadcrumb. Footer strip = key cells.
-// Hairlines (─) divide sections inside the body. The whole frame is then
-// placed via lipgloss.Place so it sits centered in any terminal size.
+// Aesthetic: closed bulletin box. Top/bottom rules use heavy corner
+// glyphs (┏ ┓ ┗ ┛); left/right edges use ┃ on every interior line so
+// the chrome reads as a fully enclosed container. Header strip = brand
+// mark + breadcrumb. Footer strip = key cells. Hairlines (─) divide
+// sections inside the body. The whole frame is then placed via
+// lipgloss.Place so it sits centered in any terminal size.
+//
+// Centering caveat: every body line is padded to canvasW-2 BEFORE the
+// vertical edges are added. Without uniform interior width, short
+// lines re-center inside their own bounding box and drift visibly
+// away from the rules. padLinesTo is what makes the box stay square.
 //
 // Inner widgets render their own internal hairline rules / tables;
-// Frame only owns the outer two strips.
+// Frame only owns the outer two strips and the side edges.
 func Frame(p Palette, width, height int, subtitle, inner, footer string, compactTitle bool) string {
 	canvasW := CanvasW(width)
+	innerW := canvasW - 2 // 1 col reserved for each vertical edge
 
 	// Header strip: small brand mark + dot separator + crumb left, theme
 	// breadcrumb right. No big figlet hero — that's only on welcome
@@ -36,20 +42,19 @@ func Frame(p Palette, width, height int, subtitle, inner, footer string, compact
 	if p.Name == "" {
 		rightStrip = ""
 	}
-	header := joinStrip(canvasW, leftStrip, rightStrip)
+	header := joinStrip(innerW, leftStrip, rightStrip)
 
-	// Top + bottom anchored rules with corner glyphs.
+	// Top + bottom anchored rules with corner glyphs at OUTER width.
 	topRule := renderCornerRule(p, canvasW, "top")
 	botRule := renderCornerRule(p, canvasW, "bottom")
-	hairline := lipgloss.NewStyle().Foreground(p.Hairline).Render(strings.Repeat("─", canvasW))
+	hairline := lipgloss.NewStyle().Foreground(p.Hairline).Render(strings.Repeat("─", innerW))
 
 	footerLine := footer
 
 	// Inner content padding (currently no extra indent — body manages its own).
 	innerPadded := indent(inner, 0)
 
-	body := strings.Join([]string{
-		topRule,
+	interior := strings.Join([]string{
 		header,
 		hairline,
 		"",
@@ -57,15 +62,18 @@ func Frame(p Palette, width, height int, subtitle, inner, footer string, compact
 		"",
 		hairline,
 		footerLine,
-		botRule,
 	}, "\n")
 
-	// Pad every body line to canvasW. lipgloss.Place centers each line
-	// individually using its own width — without uniform-width lines,
-	// short lines (action rows, footer) get re-centered separately and
-	// drift away from the heavy rules. Right-padding flattens the block
-	// into a true rectangle so Place treats it as one unit.
-	body = padLinesTo(body, canvasW)
+	// Pad every interior line to innerW so the right edge lands at a
+	// consistent column. Then prepend ┃ and append ┃ per line.
+	interior = padLinesTo(interior, innerW)
+	edge := lipgloss.NewStyle().Foreground(p.Subtle).Render("┃")
+	wrapped := make([]string, 0)
+	for _, ln := range strings.Split(interior, "\n") {
+		wrapped = append(wrapped, edge+ln+edge)
+	}
+
+	body := topRule + "\n" + strings.Join(wrapped, "\n") + "\n" + botRule
 
 	if width <= 0 || height <= 0 {
 		return body

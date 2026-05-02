@@ -33,20 +33,42 @@ feel great.
 
 ## Screens
 
-**Welcome** — animated gradient `LFG` logo, numbered actions.
+**Welcome** — animated gradient `LFG` logo, numbered actions, theme
+indicator in the top-right of the chrome.
 
 ![welcome](assets/welcome.png)
 
-**Tree picker** — bundles + tools as a collapsible tree. Status dots
-(● all · ◐ partial · ○ none), tabular ID / NAME / STATE / COUNT layout.
+**Tree picker** — bundles + tools as a collapsible tree. Live versions
+resolved from npm registry / brew api / nodejs.org dist index. Tools
+nest under their bundle, `[●]` marks mandatory, `[✓]` marks selected,
+`ALREADY INSTALLED` section calls out anything already on the host.
 
 ![tree](assets/tree.png)
 
-**Themes** — three built-in palettes, cycle live with `Ctrl+T`.
+**Tool info** — `i` on any tool opens an info card. Surfaces the
+homepage / repo, install command, and any `post_install` steps that
+will run after the main install.
 
-| LFG (default) | Dracula | Catppuccin |
-|---|---|---|
-| ![lfg](assets/welcome.png) | ![dracula](assets/welcome-dracula.png) | ![catppuccin](assets/welcome-catppuccin.png) |
+![info](assets/info.png)
+
+**Skills + dev-tools** — pick AI coding CLIs and cross-harness skills.
+Skills bundle is gated until `node-lts` is selected (skills install via
+`npx skills add`).
+
+![tree-skills](assets/tree-skills.png)
+
+**Install** — gradient progress bar, per-task tag column on every log
+line, humanized current step (`Installing Claude Code` not
+`dev-tools/claude-code`).
+
+![install](assets/install.png)
+
+**Themes** — four built-in palettes, cycle live with `Ctrl+T`. Theme
+name is shown in the top-right of every screen so cycles are visible.
+
+| LFG (default) | Dracula | Catppuccin | Colorblind (IBM blue/orange) |
+|---|---|---|---|
+| ![lfg](assets/welcome.png) | ![dracula](assets/welcome-dracula.png) | ![catppuccin](assets/welcome-catppuccin.png) | shipped |
 
 ## Flow
 
