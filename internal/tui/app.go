@@ -25,6 +25,7 @@ const (
 	screenProbe       // first-paint detection screen; entered only via NewWithProbe
 	screenConfigInput // welcome → "load config file" input dialog
 	screenInfo        // tree picker → "i" key → tool metadata overlay
+	screenExport      // welcome → "export this machine" save-to-TOML dialog
 )
 
 // Model is the root bubbletea model. Each screen is a child model;
@@ -51,6 +52,7 @@ type Model struct {
 	configInput  configInputModel
 	info         infoModel
 	infoPrev     screen // screen to return to after info dialog closes
+	export       exportModel
 
 	selectedBundleIDs map[string]bool
 	selectedTools     map[string]bool // key = bundleID + "/" + toolName
@@ -221,6 +223,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.configInput, cmd = m.configInput.Update(msg)
 	case screenInfo:
 		m.info, cmd = m.info.Update(msg)
+	case screenExport:
+		m.export, cmd = m.export.Update(msg)
 	}
 	return m, cmd
 }
@@ -252,6 +256,8 @@ func (m Model) forwardSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		m.configInput, cmd = m.configInput.Update(msg)
 	case screenInfo:
 		m.info, cmd = m.info.Update(msg)
+	case screenExport:
+		m.export, cmd = m.export.Update(msg)
 	}
 	return m, cmd
 }
@@ -282,6 +288,8 @@ func (m Model) View() string {
 		return m.configInput.View(m.width, m.height)
 	case screenInfo:
 		return m.info.View(m.width, m.height)
+	case screenExport:
+		return m.export.View(m.width, m.height)
 	case screenQuit:
 		return ""
 	}
@@ -373,6 +381,9 @@ func (m Model) transition(msg transitionMsg) (tea.Model, tea.Cmd) {
 	case screenInfo:
 		// Restored after info dialog closes; the model already exists.
 		return m, nil
+	case screenExport:
+		m.export = newExport(m.palette, m.bundles)
+		return m, m.export.Init()
 	case screenQuit:
 		return m, tea.Quit
 	}

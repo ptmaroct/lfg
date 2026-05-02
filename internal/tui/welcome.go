@@ -50,6 +50,11 @@ func newWelcome(p Palette) welcomeModel {
 				action: screenConfigInput,
 			},
 			{
+				label:  "EXPORT THIS MACHINE AS PRESET",
+				desc:   "Save the current bundle/tool set to a TOML file you can re-load elsewhere.",
+				action: screenExport,
+			},
+			{
 				label:  "BACKUP THIS MACHINE",
 				desc:   "Snapshot dotfiles, package list, configs into a single file.",
 				action: screenBackupPrompt,
@@ -84,7 +89,7 @@ func (m welcomeModel) Update(msg tea.Msg) (welcomeModel, tea.Cmd) {
 			return m, goTo(m.choices[m.cursor].action)
 		case "esc":
 			return m, goTo(screenQuitConfirm)
-		case "1", "2", "3", "4":
+		case "1", "2", "3", "4", "5":
 			idx := int(msg.String()[0] - '1')
 			if idx < len(m.choices) {
 				m.cursor = idx
@@ -133,7 +138,7 @@ func (m welcomeModel) View(width, height int) string {
 		b.String(),
 		HintLine(p,
 			KeyHint(p, "↑↓", "nav"),
-			KeyHint(p, "1-4", "jump"),
+			KeyHint(p, "1-5", "jump"),
 			KeyHint(p, "⏎", "select"),
 			KeyHint(p, "^T", "theme"),
 			KeyHint(p, "Q", "quit"),

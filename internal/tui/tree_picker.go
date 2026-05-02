@@ -33,11 +33,12 @@ type treePickerModel struct {
 }
 
 type treeRow struct {
-	kind     string // "bundle" or "tool"
+	kind     string // "bundle", "tool", or "subheader"
 	bundleID string
 	toolName string
 	depth    int
-	idx      int // index within parent bundle (1-based for tools)
+	idx      int    // index within parent bundle (1-based for tools)
+	label    string // for "subheader" rows: the label text
 }
 
 func newTreePicker(p Palette, bundles []preset.Bundle, initialBundleIDs map[string]bool, initialTools map[string]bool) treePickerModel {
@@ -49,6 +50,11 @@ func newTreePicker(p Palette, bundles []preset.Bundle, initialBundleIDs map[stri
 		pageSize: 16,
 	}
 	for k, v := range initialTools {
+		// Skip already-installed tools — they shouldn't queue for re-install.
+		bID, tName := splitKey(k)
+		if t := findToolInBundles(bundles, bID, tName); t.Installed {
+			continue
+		}
 		m.selected[k] = v
 	}
 	if len(initialTools) == 0 {
@@ -57,16 +63,19 @@ func newTreePicker(p Palette, bundles []preset.Bundle, initialBundleIDs map[stri
 				continue
 			}
 			for _, t := range b.Tools {
-				m.selected[b.ID+"/"+t.Name] = !t.Installed
+				if t.Installed {
+					continue
+				}
+				m.selected[b.ID+"/"+t.Name] = true
 			}
 		}
 	}
-	// Mandatory tools are always selected and can't be toggled off,
-	// regardless of initial state. Force-on here so the selection map
-	// is consistent before the first render.
+	// Mandatory tools that AREN'T installed yet stay always-on so they
+	// can't be unchecked. Already-installed mandatory tools are simply
+	// counted as installed and need no selection state.
 	for _, b := range bundles {
 		for _, t := range b.Tools {
-			if t.Mandatory {
+			if t.Mandatory && !t.Installed {
 				m.selected[b.ID+"/"+t.Name] = true
 			}
 		}
@@ -76,12 +85,65 @@ func newTreePicker(p Palette, bundles []preset.Bundle, initialBundleIDs map[stri
 	return m
 }
 
+// splitKey decomposes "<bundleID>/<toolName>" → (bundleID, toolName).
+func splitKey(k string) (string, string) {
+	for i := 0; i < len(k); i++ {
+		if k[i] == '/' {
+			return k[:i], k[i+1:]
+		}
+	}
+	return k, ""
+}
+
+// findToolInBundles is a free-function variant of findTool used during
+// model construction (no receiver yet).
+func findToolInBundles(bundles []preset.Bundle, bundleID, toolName string) preset.Tool {
+	for _, b := range bundles {
+		if b.ID != bundleID {
+			continue
+		}
+		for _, t := range b.Tools {
+			if t.Name == toolName {
+				return t
+			}
+		}
+	}
+	return preset.Tool{}
+}
+
 func (m *treePickerModel) rebuildRows() {
 	m.rows = m.rows[:0]
 	for _, b := range m.bundles {
 		m.rows = append(m.rows, treeRow{kind: "bundle", bundleID: b.ID})
-		if m.expanded[b.ID] {
-			for i, t := range b.Tools {
+		if !m.expanded[b.ID] {
+			continue
+		}
+		// Split tools into to-install and already-installed groups so
+		// the user sees them as two distinct sections, not one mixed
+		// list where they have to mentally filter "already done" rows.
+		var toInstall, alreadyOK []preset.Tool
+		for _, t := range b.Tools {
+			if t.Installed {
+				alreadyOK = append(alreadyOK, t)
+			} else {
+				toInstall = append(toInstall, t)
+			}
+		}
+		for i, t := range toInstall {
+			m.rows = append(m.rows, treeRow{
+				kind: "tool", bundleID: b.ID, toolName: t.Name,
+				depth: 1, idx: i + 1,
+			})
+		}
+		if len(alreadyOK) > 0 {
+			label := "ALREADY INSTALLED"
+			if len(toInstall) == 0 {
+				label = "ALREADY INSTALLED — nothing else to do here"
+			}
+			m.rows = append(m.rows, treeRow{
+				kind: "subheader", bundleID: b.ID, label: label,
+			})
+			for i, t := range alreadyOK {
 				m.rows = append(m.rows, treeRow{
 					kind: "tool", bundleID: b.ID, toolName: t.Name,
 					depth: 1, idx: i + 1,
@@ -97,9 +159,15 @@ func (m *treePickerModel) rebuildRows() {
 	}
 }
 
+// bundleSelectionState only considers not-yet-installed tools.
+// Already-installed tools are out of band — they don't participate in
+// the selection state and shouldn't influence the bundle's checkbox.
 func (m treePickerModel) bundleSelectionState(b preset.Bundle) string {
 	on, off := 0, 0
 	for _, t := range b.Tools {
+		if t.Installed {
+			continue
+		}
 		if m.selected[b.ID+"/"+t.Name] {
 			on++
 		} else {
@@ -107,6 +175,10 @@ func (m treePickerModel) bundleSelectionState(b preset.Bundle) string {
 		}
 	}
 	switch {
+	case on+off == 0:
+		// All tools in this bundle already installed. Visually treat
+		// the bundle row as "done" via the mandatory glyph.
+		return "mandatory"
 	case on == 0:
 		return "none"
 	case off == 0:
@@ -119,6 +191,9 @@ func (m treePickerModel) bundleSelectionState(b preset.Bundle) string {
 func (m treePickerModel) bundleSelectedCount(b preset.Bundle) int {
 	n := 0
 	for _, t := range b.Tools {
+		if t.Installed {
+			continue
+		}
 		if m.selected[b.ID+"/"+t.Name] {
 			n++
 		}
@@ -126,12 +201,32 @@ func (m treePickerModel) bundleSelectedCount(b preset.Bundle) int {
 	return n
 }
 
+// bundleInstalledCount counts tools detect already found.
+func (m treePickerModel) bundleInstalledCount(b preset.Bundle) int {
+	n := 0
+	for _, t := range b.Tools {
+		if t.Installed {
+			n++
+		}
+	}
+	return n
+}
+
+// bundlePendingTotal — tools that aren't installed yet (the pool the
+// checkbox + selection counter operates over).
+func (m treePickerModel) bundlePendingTotal(b preset.Bundle) int {
+	return len(b.Tools) - m.bundleInstalledCount(b)
+}
+
 func (m *treePickerModel) toggleAtCursor() {
 	row := m.rows[m.cursor]
+	if row.kind == "subheader" {
+		return
+	}
 	if row.kind == "tool" {
 		tool := m.findTool(row.bundleID, row.toolName)
-		if tool.Mandatory {
-			return // mandatory tools can't be unchecked
+		if tool.Installed || tool.Mandatory {
+			return // installed = nothing to do; mandatory = forced on
 		}
 		key := row.bundleID + "/" + row.toolName
 		m.selected[key] = !m.selected[key]
@@ -140,6 +235,9 @@ func (m *treePickerModel) toggleAtCursor() {
 	bundle := m.findBundle(row.bundleID)
 	target := m.bundleSelectionState(bundle) != "all"
 	for _, t := range bundle.Tools {
+		if t.Installed {
+			continue // installed tools never selected
+		}
 		if t.Mandatory && !target {
 			continue // can't bulk-deselect mandatory rows
 		}
@@ -375,10 +473,23 @@ func (m treePickerModel) renderRow(i int) string {
 		gutter = lipgloss.NewStyle().Foreground(p.Primary).Bold(true).Render("▸ ")
 	}
 
-	if row.kind == "bundle" {
+	switch row.kind {
+	case "bundle":
 		return gutter + m.renderBundleRow(row)
+	case "subheader":
+		return gutter + m.renderSubheaderRow(row)
+	default:
+		return gutter + m.renderToolRow(row)
 	}
-	return gutter + m.renderToolRow(row)
+}
+
+// renderSubheaderRow — small label introducing the "ALREADY INSTALLED"
+// group inside an expanded bundle. Dim, italic, indented under the
+// bundle's checkbox column so it visually nests.
+func (m treePickerModel) renderSubheaderRow(row treeRow) string {
+	p := m.palette
+	style := lipgloss.NewStyle().Foreground(p.Muted).Italic(true)
+	return "    " + style.Render(row.label)
 }
 
 // renderBundleRow:  [✓] ▼ DEFAULT                      22 tools · 22 selected
@@ -402,9 +513,21 @@ func (m treePickerModel) renderBundleRow(row treeRow) string {
 	nameRendered := nameStyle.Render(name)
 	nameCol := padName(nameRendered, name, 28)
 
+	pending := m.bundlePendingTotal(bundle)
+	installed := m.bundleInstalledCount(bundle)
 	sel := m.bundleSelectedCount(bundle)
 	total := len(bundle.Tools)
-	statusText := fmt.Sprintf("%d tools · %d selected", total, sel)
+
+	var statusText string
+	switch {
+	case pending == 0:
+		statusText = fmt.Sprintf("all %d already installed", total)
+	case installed == 0:
+		statusText = fmt.Sprintf("%d to install · %d selected", pending, sel)
+	default:
+		statusText = fmt.Sprintf("%d to install · %d selected · %d already installed",
+			pending, sel, installed)
+	}
 	status := lipgloss.NewStyle().Foreground(p.Muted).Render(statusText)
 
 	return fmt.Sprintf("%s %s %s %s", box, caretStyled, nameCol, status)
@@ -424,6 +547,8 @@ func (m treePickerModel) renderToolRow(row treeRow) string {
 
 	var box string
 	switch {
+	case tool.Installed:
+		box = checkbox(p, "mandatory") // green [●] = "already done, won't queue"
 	case tool.Mandatory:
 		box = checkbox(p, "mandatory")
 	case selected:

@@ -90,23 +90,28 @@ go build -o lfg ./cmd/lfg
 ## Usage
 
 ```sh
-lfg                        # launch TUI (default theme)
-lfg --theme=dracula        # explicit theme override
-lfg apply                  # headless install of the 'default' bundle
-lfg apply default ai-clis  # multiple bundles, non-interactively
-lfg backup                 # snapshot dotfiles + configs (tar.age)
-lfg backup --encrypt=false # plain tar.gz instead
-lfg doctor                 # diagnose environment readiness
-lfg version --verbose      # print build metadata
-lfg update                 # self-update from GitHub releases
+lfg                              # launch TUI (default theme)
+lfg --theme=dracula              # explicit theme override
+lfg apply barebones              # headless install of one bundle
+lfg apply barebones dev-tools    # multiple bundles, non-interactively
+lfg backup                       # snapshot dotfiles + configs (locked by default)
+lfg backup --encrypt=false       # plain tarball, no key needed to open
+lfg export                       # save current preset → ~/lfg-preset-<date>.toml
+lfg export -o ./my-preset.toml   # explicit output path
+lfg --config ./my-preset.toml    # load custom bundles instead of the built-in ones
+lfg --config https://example.com/preset.toml   # remote preset over http(s)
+lfg doctor                       # diagnose environment readiness
+lfg version --verbose            # print build metadata
+lfg update                       # self-update from GitHub releases
 ```
 
 `--dry-run` (or `-n`) is a persistent flag — works on every command:
 
 ```sh
 lfg -n                     # walk the TUI flow with the install step mocked
-lfg apply -n default       # print planned commands, exec nothing
+lfg apply -n barebones     # print planned commands, exec nothing
 lfg backup -n              # list source counts + would-be filename, write nothing
+lfg export -n              # print the path it would write, no file created
 ```
 
 Theme persists in `~/.config/lfg/state.json` so `--theme` is only needed once.
@@ -119,12 +124,78 @@ Theme persists in `~/.config/lfg/state.json` so `--theme` is only needed once.
 | `→ ←` | expand / collapse (tree) |
 | `space` `x` | toggle option |
 | `a` | toggle all (tree) |
+| `i` | tool info (description, homepage, install command) |
 | `enter` | confirm / continue |
-| `1`–`4` | jump to action (welcome) |
+| `1`–`5` | jump to action (welcome) |
 | `esc` | back |
 | `q` | quit (confirm dialog) |
 | `Ctrl+T` | cycle theme |
 | `Ctrl+C` | force quit |
+
+### Custom presets
+
+Pass any TOML file as `--config`. The schema mirrors the built-in preset
+(see `testdata/sample-preset.toml`):
+
+```toml
+[[bundles]]
+id = "minimal"
+name = "minimal"
+default = true
+
+  [[bundles.tools]]
+  name = "git"
+  source = "brew"
+  homepage = "https://git-scm.com"
+  install_mac = "brew install git"
+  install_linux = "sudo apt-get install -y git"
+```
+
+Mark a tool `mandatory = true` to make it always-on (rendered with `[●]`,
+can't be unchecked). Use `source = "skills"` + `skill_url = "..."` for
+agent skills installed via `npx skills add`.
+
+Round-trip your current setup:
+
+```sh
+lfg export                  # save → ~/lfg-preset-YYYY-MM-DD.toml
+# move the file to a new machine
+lfg --config ./preset.toml  # bundles, mandatories, install commands all preserved
+```
+
+### Backup — what's in it, where it goes
+
+`lfg backup` collects a curated list of files from your home directory
+into a single archive. Source groups (each one is silently skipped if
+nothing matches):
+
+- **Shell config** — `.zshrc`, `.zprofile`, `.zshenv`, `.bashrc`, `.bash_profile`, `.profile`
+- **Editors / dotfiles** — `.gitconfig`, `.tmux.conf`, `.vimrc`, `.editorconfig`, `.inputrc`
+- **Starship + dev tool configs** — `~/.config/{starship,mise,bat,btop,lazygit,yazi,glow}`
+- **Editor configs** — `~/.config/{nvim,zed,ghostty,zellij}`
+- **AI tool settings** — `~/.claude/{settings.json,CLAUDE.md,agents,commands}`, `~/.codex/config.toml`
+- **SSH** — `~/.ssh/` (config + public keys; **private keys are NEVER copied** unless you pass `--include-ssh-keys` *and* enable encryption)
+
+The TUI shows you this exact list with `●`/`○` presence dots before
+asking you to confirm — no surprise inclusions.
+
+**Why tar (not zip):** preserves UNIX file modes and symlinks, which
+matters for SSH config + dotfile hierarchies. zip mangles both. The
+output is `tar.gz` (plain) or `tar.age` (locked with a key from
+[age](https://github.com/FiloSottile/age)).
+
+**The "lock it" option:**
+
+- *Locked* — file is encrypted with a key at `~/.config/lfg/key.txt`.
+  Only that key can open it. Pick this if the backup will leave your
+  machine (cloud sync, USB, email). **Back up the key file separately**
+  — without it, even you can't recover the archive.
+- *Skip lock* — plain `.tar.gz`. Anyone with the file can read it.
+  Pick this when the archive stays on this machine and you want to
+  peek inside (`tar -tzf <file>`).
+
+**Restore later:** the result screen shows the exact `lfg backup --restore <path>`
+command for whichever option you picked.
 
 ## Architecture
 

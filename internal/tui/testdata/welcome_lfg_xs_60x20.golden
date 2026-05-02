@@ -12,12 +12,14 @@ a new dev machine, in less time than this hint takes to read
        Pick bundles, install tools. Opinionated but customizable.
   02  LOAD CONFIG FILE                                  
        Open a dialog to paste a preset path or URL.     
-  03  BACKUP THIS MACHINE                               
+  03  EXPORT THIS MACHINE AS PRESET                     
+       Save the current bundle/tool set to a TOML file you can re-load elsewhere.
+  04  BACKUP THIS MACHINE                               
        Snapshot dotfiles, package list, configs into a single file.
-  04  QUIT                                              
+  05  QUIT                                              
        Exit lfg.                                        
                                                         
                                                         
 ────────────────────────────────────────────────────────
-  [↑↓] NAV  [1-4] JUMP  [⏎] SELECT  [^T] THEME  [Q] QUIT
+  [↑↓] NAV  [1-5] JUMP  [⏎] SELECT  [^T] THEME  [Q] QUIT
 ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
