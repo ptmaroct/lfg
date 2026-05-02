@@ -47,7 +47,7 @@ func All() []Bundle {
 			Default:     true,
 			Tools: []Tool{
 				{
-					Name: "brew", Source: "custom", Binary: "brew", Mandatory: true,
+					Name: "brew", Source: "curl", Binary: "brew", Mandatory: true,
 					Description:  "Homebrew package manager — required by everything below",
 					Homepage:     "https://brew.sh",
 					InstallMac:   `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`,
@@ -96,7 +96,7 @@ func All() []Bundle {
 					InstallLinux: "mise use -g python@latest",
 				},
 				{
-					Name: "uv", Source: "custom", Binary: "uv",
+					Name: "uv", Source: "curl", Binary: "uv",
 					Description:  "Astral uv — fast Python package + project manager",
 					Homepage:     "https://docs.astral.sh/uv",
 					InstallMac:   "curl -LsSf https://astral.sh/uv/install.sh | sh",

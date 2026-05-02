@@ -1,0 +1,135 @@
+package tui
+
+import (
+	"runtime"
+	"strings"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+
+	"github.com/ptmaroct/lfg/internal/preset"
+)
+
+// infoModel — read-only "what does this tool do" overlay shown when the
+// user presses `i` on a row in the tree picker. Carries the previous
+// screen so Esc/Enter goes back without losing the picker state.
+type infoModel struct {
+	palette  Palette
+	tool     preset.Tool
+	bundleID string
+	prev     screen
+}
+
+func newInfo(p Palette, bundleID string, t preset.Tool, prev screen) infoModel {
+	return infoModel{palette: p, tool: t, bundleID: bundleID, prev: prev}
+}
+
+func (m infoModel) Init() tea.Cmd { return nil }
+
+func (m infoModel) Update(msg tea.Msg) (infoModel, tea.Cmd) {
+	if k, ok := msg.(tea.KeyMsg); ok {
+		switch k.String() {
+		case "esc", "enter", "i", "I", " ":
+			return m, func() tea.Msg { return closeInfoMsg{} }
+		}
+	}
+	return m, nil
+}
+
+// closeInfoMsg returns to the screen the info dialog was opened from
+// without rebuilding it (preserves cursor + selection state in the
+// tree picker).
+type closeInfoMsg struct{}
+
+func (m infoModel) View(width, height int) string {
+	p := m.palette
+	canvasW := width - 4
+	if canvasW > 100 {
+		canvasW = 100
+	}
+	if canvasW < 56 {
+		canvasW = 56
+	}
+	contentW := canvasW - 4
+
+	label := lipgloss.NewStyle().Foreground(p.Muted).Bold(false)
+	value := lipgloss.NewStyle().Foreground(p.Text)
+	link := lipgloss.NewStyle().Foreground(p.Accent).Underline(true)
+
+	row := func(k, v string) string {
+		if v == "" {
+			v = "—"
+		}
+		return "  " + label.Render(padRightPlain(k, 12)) + value.Render(v) + "\n"
+	}
+	linkRow := func(k, v string) string {
+		if v == "" {
+			v = "—"
+		}
+		return "  " + label.Render(padRightPlain(k, 12)) + link.Render(v) + "\n"
+	}
+
+	var b strings.Builder
+	b.WriteString(SectionLabel(p, m.tool.Name, m.bundleID, contentW))
+	b.WriteString("\n\n")
+
+	if m.tool.Description != "" {
+		b.WriteString("  " + lipgloss.NewStyle().Foreground(p.Text).Italic(true).
+			Render(m.tool.Description) + "\n\n")
+	}
+
+	// Status line.
+	status := "not installed"
+	statusColor := p.Muted
+	if m.tool.Installed {
+		statusColor = p.Success
+		if m.tool.Version != "" {
+			status = "installed (v" + m.tool.Version + ")"
+		} else {
+			status = "installed"
+		}
+	}
+	b.WriteString("  " + label.Render(padRightPlain("status", 12)) +
+		lipgloss.NewStyle().Foreground(statusColor).Bold(true).Render(status) + "\n")
+
+	b.WriteString(row("via", m.tool.Source))
+	b.WriteString(row("binary", binaryName(m.tool)))
+	b.WriteString(linkRow("homepage", m.tool.Homepage))
+	if m.tool.SkillURL != "" {
+		b.WriteString(linkRow("skill repo", m.tool.SkillURL))
+	}
+	if m.tool.Mandatory {
+		b.WriteString(row("mandatory", "yes — required by other tools"))
+	}
+
+	// Install command for current OS.
+	cmd := m.tool.InstallMac
+	if runtime.GOOS != "darwin" {
+		cmd = m.tool.InstallLinux
+	}
+	if cmd != "" {
+		b.WriteString("\n  " + label.Render("install command") + "\n")
+		b.WriteString("  " + lipgloss.NewStyle().
+			Foreground(p.Text).
+			Background(p.Panel).
+			Padding(0, 1).
+			Render(cmd) + "\n")
+	}
+
+	return Frame(p, width, height,
+		"info · "+m.tool.Name,
+		b.String(),
+		HintLine(p,
+			KeyHint(p, "⏎", "back"),
+			KeyHint(p, "⎋", "back"),
+		),
+		height < 22,
+	)
+}
+
+func binaryName(t preset.Tool) string {
+	if t.Binary != "" {
+		return t.Binary
+	}
+	return t.Name
+}

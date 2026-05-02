@@ -24,6 +24,7 @@ const (
 	screenQuitConfirm
 	screenProbe       // first-paint detection screen; entered only via NewWithProbe
 	screenConfigInput // welcome → "load config file" input dialog
+	screenInfo        // tree picker → "i" key → tool metadata overlay
 )
 
 // Model is the root bubbletea model. Each screen is a child model;
@@ -48,6 +49,8 @@ type Model struct {
 	quitConfirm  quitConfirmModel
 	probe        probeModel
 	configInput  configInputModel
+	info         infoModel
+	infoPrev     screen // screen to return to after info dialog closes
 
 	selectedBundleIDs map[string]bool
 	selectedTools     map[string]bool // key = bundleID + "/" + toolName
@@ -179,6 +182,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.welcome.Init()
 		}
 		return m, nil
+	case openInfoMsg:
+		// Stash whatever screen we're on so Esc/Enter inside info can return.
+		m.infoPrev = m.screen
+		m.info = newInfo(m.palette, msg.bundleID, msg.tool, m.screen)
+		m.screen = screenInfo
+		return m, m.info.Init()
+	case closeInfoMsg:
+		// Return to the screen we came from without rebuilding it —
+		// preserves tree-picker cursor + per-screen state.
+		m.screen = m.infoPrev
+		return m, nil
 	}
 
 	var cmd tea.Cmd
@@ -205,6 +219,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.probe, cmd = m.probe.Update(msg)
 	case screenConfigInput:
 		m.configInput, cmd = m.configInput.Update(msg)
+	case screenInfo:
+		m.info, cmd = m.info.Update(msg)
 	}
 	return m, cmd
 }
@@ -234,6 +250,8 @@ func (m Model) forwardSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		m.probe, cmd = m.probe.Update(msg)
 	case screenConfigInput:
 		m.configInput, cmd = m.configInput.Update(msg)
+	case screenInfo:
+		m.info, cmd = m.info.Update(msg)
 	}
 	return m, cmd
 }
@@ -262,10 +280,23 @@ func (m Model) View() string {
 		return m.probe.View(m.width, m.height)
 	case screenConfigInput:
 		return m.configInput.View(m.width, m.height)
+	case screenInfo:
+		return m.info.View(m.width, m.height)
 	case screenQuit:
 		return ""
 	}
 	return ""
+}
+
+// openInfoMsg pops the info overlay for a tool, remembering the screen
+// to return to. Carried by openInfoCmd from the tree picker.
+type openInfoMsg struct {
+	bundleID string
+	tool     preset.Tool
+}
+
+func openInfoCmd(bundleID string, t preset.Tool) tea.Cmd {
+	return func() tea.Msg { return openInfoMsg{bundleID: bundleID, tool: t} }
 }
 
 // transitionMsg requests a screen change, optionally carrying state.
@@ -339,6 +370,9 @@ func (m Model) transition(msg transitionMsg) (tea.Model, tea.Cmd) {
 	case screenConfigInput:
 		m.configInput = newConfigInput(m.palette)
 		return m, m.configInput.Init()
+	case screenInfo:
+		// Restored after info dialog closes; the model already exists.
+		return m, nil
 	case screenQuit:
 		return m, tea.Quit
 	}

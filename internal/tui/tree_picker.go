@@ -217,6 +217,14 @@ func (m treePickerModel) Update(msg tea.Msg) (treePickerModel, tea.Cmd) {
 			m.collapseAtCursor()
 		case " ", "x":
 			m.toggleAtCursor()
+		case "i", "I":
+			// Tool info overlay. Only meaningful on tool rows; bundle
+			// rows just no-op so the key doesn't beep.
+			row := m.rows[m.cursor]
+			if row.kind == "tool" {
+				tool := m.findTool(row.bundleID, row.toolName)
+				return m, openInfoCmd(row.bundleID, tool)
+			}
 		case "a":
 			anyOn := false
 			for _, b := range m.bundles {
@@ -232,11 +240,10 @@ func (m treePickerModel) Update(msg tea.Msg) (treePickerModel, tea.Cmd) {
 				}
 			}
 		case "enter":
-			row := m.rows[m.cursor]
-			if row.kind == "bundle" && !m.expanded[row.bundleID] {
-				m.expandAtCursor()
-				return m, nil
-			}
+			// Enter always proceeds. Expand/collapse is reserved for
+			// arrow keys (→ ←) so Enter doesn't change meaning based
+			// on cursor row state — pressing it twice on a bundle
+			// shouldn't first expand and then advance.
 			if m.totalSelected() == 0 {
 				return m, nil
 			}
@@ -309,6 +316,7 @@ func (m treePickerModel) View(width, height int) string {
 			KeyHint(p, "↑↓", "nav"),
 			KeyHint(p, "→←", "tree"),
 			KeyHint(p, "SP", "toggle"),
+			KeyHint(p, "I", "info"),
 			KeyHint(p, "A", "all"),
 			KeyHint(p, "⏎", "next"),
 			KeyHint(p, "⎋", "back"),
