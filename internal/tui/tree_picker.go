@@ -176,9 +176,8 @@ func (m treePickerModel) bundleSelectionState(b preset.Bundle) string {
 	}
 	switch {
 	case on+off == 0:
-		// All tools in this bundle already installed. Visually treat
-		// the bundle row as "done" via the mandatory glyph.
-		return "mandatory"
+		// All tools in this bundle already installed.
+		return "done"
 	case on == 0:
 		return "none"
 	case off == 0:
@@ -426,11 +425,13 @@ func (m treePickerModel) View(width, height int) string {
 func (m treePickerModel) renderColumnHeader(contentW int) string {
 	p := m.palette
 	colStyle := lipgloss.NewStyle().Foreground(p.Muted)
-	// Header offsets line up with renderBundleRow / renderToolRow:
-	//   cursor(2) + checkbox([✓]=3 + space) + caret(▼+space) + NAME col,
-	//   then INSTALLED + VIA columns aligned to the tool-row layout.
-	return fmt.Sprintf("        %s   %s %s",
-		colStyle.Render(padRightPlain("BUNDLE / TOOL", 28)),
+	// Offsets match renderToolRow (the only row that renders the
+	// INSTALLED + VIA columns):
+	//   gutter(2) + indent(4) + [✓](3) + space(1) = 10 spaces before name,
+	//   then padRightPlain(22) name, then "  " gap, then 12-wide installed,
+	//   then " " + via.
+	return fmt.Sprintf("          %s  %s %s",
+		colStyle.Render(padRightPlain("BUNDLE / TOOL", 22)),
 		colStyle.Render(padRightPlain("INSTALLED", 12)),
 		colStyle.Render("VIA"),
 	)
@@ -441,18 +442,22 @@ func (m treePickerModel) renderColumnHeader(contentW int) string {
 //	[ ] = none (Muted, not Subtle — Subtle blends into the background)
 //	[~] = partial (Warn, bold)
 //	[✓] = all / selected (Primary, bold)
-//	[●] = mandatory (always-on, can't be toggled)
+//	[●] = mandatory (always-on, can't be toggled — high-contrast green)
+//	[✓] = done — already installed (Muted, NOT bold; reads as background)
 func checkbox(p Palette, state string) string {
-	style := lipgloss.NewStyle().Bold(true)
 	switch state {
 	case "all":
-		return style.Foreground(p.Primary).Render("[✓]")
+		return lipgloss.NewStyle().Bold(true).Foreground(p.Primary).Render("[✓]")
 	case "partial":
-		return style.Foreground(p.Warn).Render("[~]")
+		return lipgloss.NewStyle().Bold(true).Foreground(p.Warn).Render("[~]")
 	case "mandatory":
-		return style.Foreground(p.Success).Render("[●]")
+		return lipgloss.NewStyle().Bold(true).Foreground(p.Success).Render("[●]")
+	case "done":
+		// Subdued so installed-tool rows recede; the eye finds the
+		// pickable rows first instead of the dense green grid.
+		return lipgloss.NewStyle().Foreground(p.Muted).Render("[✓]")
 	default:
-		return style.Foreground(p.Muted).Render("[ ]")
+		return lipgloss.NewStyle().Bold(true).Foreground(p.Muted).Render("[ ]")
 	}
 }
 
@@ -518,15 +523,18 @@ func (m treePickerModel) renderBundleRow(row treeRow) string {
 	sel := m.bundleSelectedCount(bundle)
 	total := len(bundle.Tools)
 
+	// Tight stat strings so the bundle row fits on one line and doesn't
+	// collide with the INSTALLED/VIA columns when those aren't on this
+	// row. Order: picked count first (the action item), then a softer
+	// "(N installed)" tail when relevant.
 	var statusText string
 	switch {
 	case pending == 0:
-		statusText = fmt.Sprintf("all %d already installed", total)
+		statusText = fmt.Sprintf("all %d done", total)
 	case installed == 0:
-		statusText = fmt.Sprintf("%d to install · %d selected", pending, sel)
+		statusText = fmt.Sprintf("%d/%d picked", sel, pending)
 	default:
-		statusText = fmt.Sprintf("%d to install · %d selected · %d already installed",
-			pending, sel, installed)
+		statusText = fmt.Sprintf("%d/%d picked  ·  %d done", sel, pending, installed)
 	}
 	status := lipgloss.NewStyle().Foreground(p.Muted).Render(statusText)
 
@@ -548,7 +556,7 @@ func (m treePickerModel) renderToolRow(row treeRow) string {
 	var box string
 	switch {
 	case tool.Installed:
-		box = checkbox(p, "mandatory") // green [●] = "already done, won't queue"
+		box = checkbox(p, "done") // muted [✓] — recedes into background
 	case tool.Mandatory:
 		box = checkbox(p, "mandatory")
 	case selected:
@@ -562,13 +570,17 @@ func (m treePickerModel) renderToolRow(row treeRow) string {
 	indent := "    "
 
 	nameStyle := lipgloss.NewStyle().Foreground(p.Text)
-	if selected {
+	switch {
+	case tool.Installed:
+		nameStyle = nameStyle.Foreground(p.Muted) // recede
+	case selected:
 		nameStyle = nameStyle.Foreground(p.Primary).Bold(true)
 	}
 	nameRendered := nameStyle.Render(tool.Name)
 	nameCol := padName(nameRendered, tool.Name, 22)
 
 	// "current" column: installed version, or em-dash when missing.
+	// Muted (not Success-green) so the installed grid doesn't shout.
 	var current string
 	if tool.Installed {
 		v := tool.Version
@@ -577,13 +589,17 @@ func (m treePickerModel) renderToolRow(row treeRow) string {
 		} else {
 			v = "v" + v
 		}
-		current = lipgloss.NewStyle().Foreground(p.Success).Render(v)
+		current = lipgloss.NewStyle().Foreground(p.Muted).Render(v)
 	} else {
-		current = lipgloss.NewStyle().Foreground(p.Muted).Render("—")
+		current = lipgloss.NewStyle().Foreground(p.Subtle).Render("—")
 	}
 	currentCol := padPlain(current, 12)
 
-	src := lipgloss.NewStyle().Foreground(p.Muted).Render(tool.Source)
+	srcColor := p.Muted
+	if tool.Installed {
+		srcColor = p.Subtle
+	}
+	src := lipgloss.NewStyle().Foreground(srcColor).Render(tool.Source)
 
 	return fmt.Sprintf("%s%s %s  %s %s", indent, box, nameCol, currentCol, src)
 }
