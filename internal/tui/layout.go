@@ -34,8 +34,14 @@ func Frame(p Palette, width, height int, subtitle, inner, footer string, compact
 	crumb := lipgloss.NewStyle().Foreground(p.Text).Render(strings.ToUpper(subtitle))
 	leftStrip := brand + dot + crumb
 
-	// Right-side breadcrumb empty for now; could carry "v0.1" or theme name.
-	rightStrip := ""
+	// Right-side breadcrumb: active theme name. Surfaces what `^T` cycles
+	// landed on so users see the change reflected in chrome.
+	themeStyle := lipgloss.NewStyle().Foreground(p.Accent).Bold(true)
+	themeLabel := lipgloss.NewStyle().Foreground(p.Subtle).Render("THEME ")
+	rightStrip := themeLabel + themeStyle.Render(strings.ToUpper(string(p.Name)))
+	if p.Name == "" {
+		rightStrip = ""
+	}
 	header := joinStrip(canvasW, leftStrip, rightStrip)
 
 	// Top + bottom anchored rules with corner glyphs.

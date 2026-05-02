@@ -1,5 +1,5 @@
 # lfg — build, test, snapshot, demo
-.PHONY: build run test snap snap-update widths demo docker docker-run clean release release-snapshot
+.PHONY: build run test snap snap-update widths demo docker docker-run docker-shell clean release release-snapshot
 
 build:
 	go build -o lfg ./cmd/lfg
@@ -38,6 +38,14 @@ docker:
 
 docker-run:
 	docker run --rm -it lfg
+
+# Fresh blank Ubuntu shell with `lfg` on PATH. Type `lfg` to launch.
+# Builds image on first run (slow, ~2min — pulls ubuntu base + brew).
+# After that, layer cache makes rebuild instant. Re-run `make docker`
+# manually after source changes to refresh `lfg`.
+docker-shell:
+	@docker image inspect lfg >/dev/null 2>&1 || $(MAKE) docker
+	docker run --rm -it --entrypoint bash lfg
 
 # Local snapshot release via goreleaser — builds all platforms into
 # ./dist/ without uploading anywhere. Useful for smoke-testing the

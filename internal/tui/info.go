@@ -119,7 +119,7 @@ func (m infoModel) View(width, height int) string {
 	return Frame(p, width, height,
 		"info · "+m.tool.Name,
 		b.String(),
-		HintLine(p, KeyHint(p, "⏎ ⎋ I", "back")),
+		HintLine(p, KeyHint(p, "⎋", "back")),
 		height < 22,
 	)
 }

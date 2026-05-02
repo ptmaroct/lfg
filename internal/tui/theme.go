@@ -31,6 +31,7 @@ const (
 // scattering Primary into body content; it loses signal value.
 // Gradient is reserved for the title hero block on welcome only.
 type Palette struct {
+	Name     ThemeName              // active theme identifier — surfaced in header
 	Bg       lipgloss.TerminalColor // usually NoColor — let terminal show through
 	Panel    lipgloss.TerminalColor // usually NoColor
 	Primary  lipgloss.TerminalColor
@@ -70,17 +71,29 @@ func gradientColors(p Palette) []lipgloss.Color {
 // Mid-gray neutrals used by every theme. Picked from the readable-on-
 // both-bgs band: dark enough to show on white, light enough on black.
 //
-//	muted   = #8A8A95  reads as ~50% on both bgs (info text)
-//	subtle  = #707080  one notch dimmer (secondary info)
-//	hairline= #5A5A66  rule lines, low-attention chrome
+//	muted   = #9CA3AF  reads as ~55% on both bgs (info text)
+//	subtle  = #828894  secondary info, still visible on dark
+//	hairline= #6E7280  rule lines — bumped from #5A5A66 which was
+//	                   nearly invisible on near-black terminal bgs
 //
-// Don't go below ~#505050 — everything past that disappears on dark.
-// Don't go above ~#A0A0A0 — washes out on light.
+// Don't go below ~#606060 — everything past that disappears on dark.
+// Don't go above ~#A8A8A8 — washes out on light.
 var (
-	neutralMuted    = lipgloss.Color("#8A8A95")
-	neutralSubtle   = lipgloss.Color("#707080")
-	neutralHairline = lipgloss.Color("#5A5A66")
+	neutralMuted    = lipgloss.Color("#9CA3AF")
+	neutralSubtle   = lipgloss.Color("#828894")
+	neutralHairline = lipgloss.Color("#6E7280")
 )
+
+// neutralText is the body-copy foreground. We were using NoColor (let
+// terminal pick) but some terminals — particularly inside docker /
+// over ssh / under tmux + alt-screen — render the default fg as black
+// even on a dark bg, leaving body text invisible. Pinning an explicit
+// AdaptiveColor sidesteps the unreliable terminal-default lookup.
+//
+// Light bg → near-black for max contrast on white surfaces.
+// Dark bg  → near-white but pulled slightly off-pure so it doesn't
+//            scream against an OLED black; still > 12:1 contrast on #000.
+var neutralText = lipgloss.AdaptiveColor{Light: "#1F2937", Dark: "#E5E7EB"}
 
 // PaletteFor returns the palette for a theme name. Default = LFG.
 //
@@ -89,12 +102,22 @@ var (
 // black without retuning. Text/Bg/Panel stay NoColor so the terminal's
 // own scheme drives those.
 func PaletteFor(name ThemeName) Palette {
+	p := paletteFor(name)
+	if name == "" {
+		p.Name = ThemeLFG
+	} else {
+		p.Name = name
+	}
+	return p
+}
+
+func paletteFor(name ThemeName) Palette {
 	switch name {
 	case ThemeColorblind:
 		// IBM colorblind-safe scheme. Blue + orange + magenta — no
 		// red/green pair. Source: davidmathlogic.com/colorblind/.
 		return Palette{
-			Bg: lipgloss.NoColor{}, Panel: lipgloss.NoColor{}, Text: lipgloss.NoColor{},
+			Bg: lipgloss.NoColor{}, Panel: lipgloss.NoColor{}, Text: neutralText,
 			Primary:  lipgloss.Color("#3B82F6"), // blue
 			Accent:   lipgloss.Color("#A78BFA"), // purple
 			Success:  lipgloss.Color("#0EA5E9"), // sky (avoid green confusion)
@@ -114,7 +137,7 @@ func PaletteFor(name ThemeName) Palette {
 		// dark bg only — pulled toward darker variants so they read on
 		// white too without losing the purple/pink identity.
 		return Palette{
-			Bg: lipgloss.NoColor{}, Panel: lipgloss.NoColor{}, Text: lipgloss.NoColor{},
+			Bg: lipgloss.NoColor{}, Panel: lipgloss.NoColor{}, Text: neutralText,
 			Primary:  lipgloss.Color("#D63384"), // pink (darkened from #FF79C6)
 			Accent:   lipgloss.Color("#7048E8"), // violet (darkened from #BD93F9)
 			Success:  lipgloss.Color("#2EA043"), // green (darkened from #50FA7B)
@@ -134,7 +157,7 @@ func PaletteFor(name ThemeName) Palette {
 		// Mid-luminance Catppuccin Mocha-flavored. Pastels darkened
 		// enough to read on white without washing out.
 		return Palette{
-			Bg: lipgloss.NoColor{}, Panel: lipgloss.NoColor{}, Text: lipgloss.NoColor{},
+			Bg: lipgloss.NoColor{}, Panel: lipgloss.NoColor{}, Text: neutralText,
 			Primary:  lipgloss.Color("#D02A8A"), // pink (darkened from #F5C2E7)
 			Accent:   lipgloss.Color("#7C3FBF"), // mauve (darkened from #CBA6F7)
 			Success:  lipgloss.Color("#1F7C3D"), // green (darkened from #A6E3A1)
@@ -157,7 +180,7 @@ func PaletteFor(name ThemeName) Palette {
 		// brand identity preserved, but pulled darker (#E91E63) than
 		// the original #FF5FD9 which faded into pastel on white bg.
 		return Palette{
-			Bg: lipgloss.NoColor{}, Panel: lipgloss.NoColor{}, Text: lipgloss.NoColor{},
+			Bg: lipgloss.NoColor{}, Panel: lipgloss.NoColor{}, Text: neutralText,
 			Primary:  lipgloss.Color("#E91E63"), // pink-500
 			Accent:   lipgloss.Color("#7C3AED"), // violet-600
 			Success:  lipgloss.Color("#059669"), // emerald-600

@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -51,8 +53,9 @@ func (m doneModel) View(width, height int) string {
 	b.WriteString(SectionLabel(p, "Next steps", "", contentW))
 	b.WriteString("\n\n")
 
+	reload := reloadShellCmd()
 	steps := []struct{ cmd, desc string }{
-		{"exec zsh", "reload your shell"},
+		{reload, "reload your shell (PATH updates already written to your rc)"},
 		{"lfg backup", "snapshot this machine"},
 		{"lfg", "re-run anytime"},
 	}
@@ -85,4 +88,20 @@ func (m doneModel) View(width, height int) string {
 		HintLine(p, KeyHint(p, "any", "exit")),
 		height < 22,
 	)
+}
+
+// reloadShellCmd returns the literal command the user should run to
+// pick up the rc changes lfg just wrote. We can't reload the parent
+// shell from a child process — POSIX env doesn't allow it — so we hand
+// back the most idiomatic command for the detected shell instead.
+func reloadShellCmd() string {
+	shell := strings.ToLower(filepath.Base(os.Getenv("SHELL")))
+	switch {
+	case strings.Contains(shell, "fish"):
+		return "exec fish"
+	case strings.Contains(shell, "bash"):
+		return "exec bash -l"
+	default:
+		return "exec zsh"
+	}
 }
