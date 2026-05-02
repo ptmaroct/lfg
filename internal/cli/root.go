@@ -7,7 +7,10 @@ package cli
 import (
 	"fmt"
 	"os"
+	"strings"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 	"github.com/spf13/cobra"
 
 	"github.com/ptmaroct/lfg/internal/preset"
@@ -30,6 +33,11 @@ var dryRun bool
 // configFlag points at a TOML preset file (local path or http(s) URL).
 // Empty → use the built-in preset.All().
 var configFlag string
+
+// bgFlag forces the terminal background interpretation: auto / dark / light.
+// "auto" calls into termenv; if that fails (some terminals don't reply to
+// the OSC-11 query), we fall back to dark — dev terminals skew dark.
+var bgFlag string
 
 // rootCmd is the top-level `lfg` command.
 var rootCmd = &cobra.Command{
@@ -62,6 +70,48 @@ func init() {
 		"preview only — no commands run, no files written")
 	rootCmd.PersistentFlags().StringVarP(&configFlag, "config", "c", "",
 		"preset file (local path or http(s) URL); defaults to the built-in preset")
+	rootCmd.PersistentFlags().StringVar(&bgFlag, "bg", "auto",
+		"terminal background: auto, dark, light (or set LFG_BG)")
+}
+
+// applyBg resolves --bg / $LFG_BG / auto-detect into a single
+// HasDarkBackground decision and pins lipgloss to it. Auto-detect uses
+// termenv (which queries OSC-11). Some terminals don't reply — we
+// default to dark in that case because dev terminals skew dark.
+func applyBg() {
+	choice := strings.ToLower(strings.TrimSpace(bgFlag))
+	if env := strings.ToLower(strings.TrimSpace(os.Getenv("LFG_BG"))); env != "" {
+		choice = env
+	}
+	switch choice {
+	case "dark":
+		lipgloss.SetHasDarkBackground(true)
+		return
+	case "light":
+		lipgloss.SetHasDarkBackground(false)
+		return
+	}
+	// auto: ask termenv. If it returns false but the terminal is dark
+	// (common — many terminals don't answer OSC-11), prefer dark.
+	out := termenv.NewOutput(os.Stdout)
+	dark := out.HasDarkBackground()
+	if !dark {
+		// Some terminals (alacritty / ghostty in some configs) report
+		// false even when bg is dark. As a tie-break, sniff COLORFGBG
+		// when set — second field is bg ANSI; "0" is black, "8"+ are
+		// dark. If absent, keep dark as the safe default.
+		if cfb := os.Getenv("COLORFGBG"); cfb != "" {
+			parts := strings.Split(cfb, ";")
+			if len(parts) >= 2 {
+				bg := parts[len(parts)-1]
+				// 0–6, 8 are dark in the typical mapping; 7, 15 are light.
+				dark = bg != "7" && bg != "15"
+			}
+		} else {
+			dark = true
+		}
+	}
+	lipgloss.SetHasDarkBackground(dark)
 }
 
 // loadPreset returns the bundle slice for this run. Honors --config when
@@ -103,7 +153,7 @@ func resolveTheme() (tui.ThemeName, bool) {
 func validateTheme(name string) tui.ThemeName {
 	t := tui.ThemeName(name)
 	switch t {
-	case tui.ThemeLFG, tui.ThemeDracula, tui.ThemeCatppuccin:
+	case tui.ThemeLFG, tui.ThemeDracula, tui.ThemeCatppuccin, tui.ThemeColorblind:
 		return t
 	}
 	fmt.Fprintf(os.Stderr, "lfg: unknown theme %q, falling back to 'lfg'\n", name)

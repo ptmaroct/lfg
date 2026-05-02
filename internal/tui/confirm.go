@@ -153,37 +153,22 @@ type statCell struct {
 	color lipgloss.TerminalColor
 }
 
-// renderStatCells lays out cells side-by-side with rounded borders so each
-// reads as its own readout. Falls back to flat numerals when columns
-// would be too narrow to box cleanly.
+// renderStatCells lays out cells as borderless "value · LABEL" pairs
+// separated by " | ". Boxed-border layout was too fragile across
+// terminal widths (top-right corner intermittently missing) — plain
+// text always renders correctly.
 func renderStatCells(p Palette, contentW int, cells []statCell) string {
 	if len(cells) == 0 {
 		return ""
 	}
-	gap := 2
-	cellW := (contentW - 2 - gap*(len(cells)-1)) / len(cells)
-	if cellW < 14 {
-		return renderStatRow(p, contentW, cells)
-	}
-
-	rendered := make([]string, 0, len(cells))
+	mutedSep := lipgloss.NewStyle().Foreground(p.Subtle).Render("  │  ")
+	parts := make([]string, 0, len(cells))
 	for _, c := range cells {
 		val := lipgloss.NewStyle().Foreground(c.color).Bold(true).Render(c.value)
 		label := lipgloss.NewStyle().Foreground(p.Muted).Render(c.label)
-		body := lipgloss.JoinVertical(lipgloss.Center,
-			lipgloss.PlaceHorizontal(cellW-4, lipgloss.Center, val),
-			lipgloss.PlaceHorizontal(cellW-4, lipgloss.Center, label),
-		)
-		box := lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(p.Muted). // visible on both light + dark bg
-			Padding(0, 1).
-			Width(cellW - 2).
-			Render(body)
-		rendered = append(rendered, box)
+		parts = append(parts, val+" "+label)
 	}
-	row := lipgloss.JoinHorizontal(lipgloss.Top, joinWithGap(rendered, gap)...)
-	return "  " + row
+	return "  " + strings.Join(parts, mutedSep)
 }
 
 func joinWithGap(items []string, gap int) []string {

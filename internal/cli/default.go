@@ -14,6 +14,7 @@ import (
 // runTUI is the default `lfg` action — launch the interactive bubbletea
 // program. Called from rootCmd.RunE when no subcommand is given.
 func runTUI() error {
+	applyBg()
 	theme, fromFlag := resolveTheme()
 
 	// Persist theme on first run / when --theme is used so subsequent

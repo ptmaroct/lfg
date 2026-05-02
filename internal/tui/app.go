@@ -167,10 +167,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.quitConfirm = newQuitConfirm(m.palette)
 			return m, m.quitConfirm.Init()
 		}
-		// Global `ctrl+t` → cycle theme (lfg → dracula → catppuccin → lfg).
-		// Use ctrl-prefixed so plain `t` stays available as filter input
-		// inside huh.MultiSelect-based pickers.
-		if msg.String() == "ctrl+t" {
+		// Theme cycle. Bound to multiple keys because terminals
+		// vary on whether ctrl+t reaches the app (Ghostty + tmux
+		// sometimes intercept it). Capital T is a reliable fallback
+		// that won't collide with picker filter input (which uses
+		// lowercase t).
+		if msg.String() == "ctrl+t" || msg.String() == "T" {
 			m.theme = nextTheme(m.theme)
 			m.palette = PaletteFor(m.theme)
 			return m.rehydrate()
@@ -390,10 +392,16 @@ func (m Model) transition(msg transitionMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// nextTheme cycles through the three built-in themes.
+// nextTheme cycles through the built-in themes. Colorblind sits first
+// in the cycle (after the default LFG theme) so accessibility users hit
+// it on the very first Ctrl+T press without hunting through the menu.
+//
+// Order: lfg → colorblind → dracula → catppuccin → lfg
 func nextTheme(t ThemeName) ThemeName {
 	switch t {
 	case ThemeLFG:
+		return ThemeColorblind
+	case ThemeColorblind:
 		return ThemeDracula
 	case ThemeDracula:
 		return ThemeCatppuccin
@@ -448,6 +456,12 @@ func (m Model) rehydrate() (tea.Model, tea.Cmd) {
 	case screenConfigInput:
 		m.configInput = newConfigInput(m.palette)
 		return m, m.configInput.Init()
+	case screenInfo:
+		m.info = newInfo(m.palette, m.info.bundleID, m.info.tool, m.infoPrev)
+		return m, m.info.Init()
+	case screenExport:
+		m.export = newExport(m.palette, m.bundles)
+		return m, m.export.Init()
 	}
 	return m, nil
 }
