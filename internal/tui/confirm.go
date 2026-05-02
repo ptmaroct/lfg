@@ -22,17 +22,24 @@ import (
 //   5. huh.NewConfirm form (Title disabled — section label owns the
 //      headline, form just renders the buttons)
 type confirmModel struct {
-	palette   Palette
-	form      *huh.Form
-	answer    bool
+	palette Palette
+	form    *huh.Form
+	// answer is "go back" (true=back, false=install). The Affirmative
+	// (left) slot is "Back" so back sits on the left of the button row;
+	// Install is on the right and is the default-focused button.
+	// Pointer (not value) so the form's bound accessor and the model's
+	// reads stay coherent across bubbletea's value-receiver copies.
+	answer    *bool
 	toInstall []preset.Tool
 	alreadyOK int
 	bySource  map[string]int
 }
 
 func newConfirm(p Palette, bundles []preset.Bundle, selected map[string]bool) confirmModel {
-	// Default to "install" focused so users can hit Enter immediately.
-	m := confirmModel{palette: p, bySource: map[string]int{}, answer: true}
+	// answer=false → Install (Negative slot, right) is focused so users
+	// can hit Enter immediately to install.
+	answer := false
+	m := confirmModel{palette: p, bySource: map[string]int{}, answer: &answer}
 	for _, b := range bundles {
 		for _, t := range b.Tools {
 			key := b.ID + "/" + t.Name
@@ -50,9 +57,9 @@ func newConfirm(p Palette, bundles []preset.Bundle, selected map[string]bool) co
 	m.form = huh.NewForm(
 		huh.NewGroup(
 			huh.NewConfirm().
-				Affirmative("Install").
-				Negative("Back").
-				Value(&m.answer),
+				Affirmative("Back").
+				Negative("Install").
+				Value(m.answer),
 		),
 	).
 		WithTheme(HuhTheme(p)).
@@ -68,9 +75,9 @@ func (m confirmModel) Update(msg tea.Msg) (confirmModel, tea.Cmd) {
 		switch k.String() {
 		case "esc":
 			return m, goTo(screenTree)
-		case "y", "Y":
+		case "i", "I":
 			return m, goTo(screenProgress)
-		case "n", "N":
+		case "b", "B":
 			return m, goTo(screenTree)
 		}
 	}
@@ -80,10 +87,11 @@ func (m confirmModel) Update(msg tea.Msg) (confirmModel, tea.Cmd) {
 		m.form = ff
 	}
 	if m.form.State == huh.StateCompleted {
-		if m.answer {
-			return m, goTo(screenProgress)
+		// answer is bound to Affirmative ("Back"). true=back, false=install.
+		if m.answer != nil && *m.answer {
+			return m, goTo(screenTree)
 		}
-		return m, goTo(screenTree)
+		return m, goTo(screenProgress)
 	}
 	return m, cmd
 }
@@ -132,8 +140,8 @@ func (m confirmModel) View(width, height int) string {
 		b.String(),
 		HintLine(p,
 			KeyHint(p, "←→", "switch"),
-			KeyHint(p, "Y", "install"),
-			KeyHint(p, "N", "back"),
+			KeyHint(p, "I", "install"),
+			KeyHint(p, "B", "back"),
 			KeyHint(p, "⏎", "select"),
 		),
 		height < 22,

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -15,6 +17,7 @@ import (
 
 	"github.com/ptmaroct/lfg/internal/installer"
 	"github.com/ptmaroct/lfg/internal/preset"
+	"github.com/ptmaroct/lfg/internal/state"
 )
 
 // ProgressRunner is the function signature progressModel uses to drive
@@ -39,11 +42,14 @@ type progressModel struct {
 	bar       progress.Model
 	stopwatch stopwatch.Model
 	done      bool
+	awaitAck  bool   // when done with failures, hold on this screen until user presses Enter
+	logPath   string // where the full transcript was written
 
 	runner ProgressRunner
 	lineCh chan installer.Line
 	doneCh chan []installer.FailedStep
 	cancel context.CancelFunc
+	logF   *os.File
 }
 
 // installLineMsg wraps a streamed installer.Line for the bubbletea loop.
@@ -110,6 +116,8 @@ func newProgressWithRunner(p Palette, bundles []preset.Bundle, selected map[stri
 
 	sw := stopwatch.NewWithInterval(100 * time.Millisecond)
 
+	logF, logPath := openLogFile()
+
 	return progressModel{
 		palette:   p,
 		plan:      plan,
@@ -120,6 +128,8 @@ func newProgressWithRunner(p Palette, bundles []preset.Bundle, selected map[stri
 		runner:    runner,
 		lineCh:    make(chan installer.Line, 64),
 		doneCh:    make(chan []installer.FailedStep, 1),
+		logF:      logF,
+		logPath:   logPath,
 	}
 }
 
@@ -133,6 +143,25 @@ func (m progressModel) Init() tea.Cmd {
 		close(m.lineCh)
 	}()
 	return tea.Batch(m.spinner.Tick, m.stopwatch.Start(), m.waitLine())
+}
+
+// openLogFile creates a per-run transcript at ~/.config/lfg/logs/install-<ts>.log.
+// Failure to open is non-fatal — install continues without persistent log.
+func openLogFile() (*os.File, string) {
+	dir, err := state.ConfigDir()
+	if err != nil {
+		return nil, ""
+	}
+	logDir := filepath.Join(dir, "logs")
+	if err := os.MkdirAll(logDir, 0o700); err != nil {
+		return nil, ""
+	}
+	path := filepath.Join(logDir, fmt.Sprintf("install-%s.log", time.Now().Format("20060102-150405")))
+	f, err := os.Create(path)
+	if err != nil {
+		return nil, ""
+	}
+	return f, path
 }
 
 // waitLine returns a tea.Cmd that pulls one Line off the channel. The
@@ -165,6 +194,12 @@ func (m progressModel) Update(msg tea.Msg) (progressModel, tea.Cmd) {
 		return m, cmd
 	case installLineMsg:
 		l := installer.Line(msg)
+		// Persist every line to the on-disk transcript before the
+		// in-memory tail trims it.
+		if m.logF != nil {
+			fmt.Fprintf(m.logF, "[%s] %-6s  %s\t%s\n",
+				time.Now().Format("15:04:05"), l.Stream, l.Tool, l.Text)
+		}
 		switch l.Stream {
 		case "begin":
 			m.currentT = l.Tool
@@ -175,7 +210,11 @@ func (m progressModel) Update(msg tea.Msg) (progressModel, tea.Cmd) {
 				status = lipgloss.NewStyle().Foreground(m.palette.Warn).Render("✗")
 			}
 			short := l.Tool
-			m.logs = append(m.logs, fmt.Sprintf("%s  %-26s  done", status, short))
+			suffix := "done"
+			if l.Text != "" {
+				suffix = "FAILED: " + truncate(l.Text, 50)
+			}
+			m.logs = append(m.logs, fmt.Sprintf("%s  %-26s  %s", status, short, suffix))
 		case "stdout", "stderr":
 			if l.Text != "" {
 				dot := lipgloss.NewStyle().Foreground(m.palette.Subtle).Render("·")
@@ -189,6 +228,17 @@ func (m progressModel) Update(msg tea.Msg) (progressModel, tea.Cmd) {
 	case installFinishedMsg:
 		m.done = true
 		m.failed = msg.failed
+		if m.logF != nil {
+			_ = m.logF.Close()
+			m.logF = nil
+		}
+		// On failure, stop on this screen and require the user to
+		// acknowledge so errors stay readable. Clean runs still
+		// auto-advance to the celebration screen.
+		if len(m.failed) > 0 {
+			m.awaitAck = true
+			return m, m.stopwatch.Stop()
+		}
 		return m, tea.Batch(
 			m.stopwatch.Stop(),
 			tea.Tick(800*time.Millisecond, func(time.Time) tea.Msg {
@@ -200,6 +250,15 @@ func (m progressModel) Update(msg tea.Msg) (progressModel, tea.Cmd) {
 		m.bar = pm.(progress.Model)
 		return m, cmd
 	case tea.KeyMsg:
+		if m.awaitAck {
+			switch msg.String() {
+			case "enter", " ":
+				return m, goTo(screenDone)
+			case "esc":
+				return m, goTo(screenConfirm)
+			}
+			return m, nil
+		}
 		if msg.String() == "esc" {
 			if m.cancel != nil {
 				m.cancel()
@@ -303,13 +362,52 @@ func (m progressModel) View(width, height int) string {
 	}
 	b.WriteString("  " + Hairline(p, contentW-2))
 
+	// Failure summary + log file location, surfaced when awaiting ack so
+	// the user knows where to read the full transcript.
+	if m.awaitAck {
+		b.WriteString("\n")
+		title := lipgloss.NewStyle().Foreground(p.Warn).Bold(true).
+			Render(fmt.Sprintf("  ✗ %d step(s) failed", len(m.failed)))
+		b.WriteString(title + "\n")
+		for i, f := range m.failed {
+			if i >= 5 {
+				more := lipgloss.NewStyle().Foreground(p.Muted).Italic(true).
+					Render(fmt.Sprintf("    ... +%d more (see log)", len(m.failed)-i))
+				b.WriteString(more + "\n")
+				break
+			}
+			tool := stepLabel(f.Step)
+			line := fmt.Sprintf("    · %s: %s", tool, truncate(f.Err.Error(), 60))
+			b.WriteString(lipgloss.NewStyle().Foreground(p.Muted).Render(line) + "\n")
+		}
+		if m.logPath != "" {
+			pathLine := lipgloss.NewStyle().Foreground(p.Subtle).
+				Render("  log: " + m.logPath)
+			b.WriteString(pathLine + "\n")
+		}
+	}
+
+	hints := []string{
+		KeyHint(p, "⎋", "cancel"),
+		KeyHint(p, "^C", "quit"),
+	}
+	if m.awaitAck {
+		hints = []string{
+			KeyHint(p, "⏎", "continue"),
+			KeyHint(p, "⎋", "back"),
+		}
+	}
 	return Frame(p, width, height,
 		"installing",
 		b.String(),
-		HintLine(p,
-			KeyHint(p, "⎋", "cancel"),
-			KeyHint(p, "^C", "quit"),
-		),
+		HintLine(p, hints...),
 		height < 22,
 	)
+}
+
+func stepLabel(s installer.Step) string {
+	if s.Bootstrap {
+		return s.Backend + " (bootstrap)"
+	}
+	return s.Bundle + "/" + s.Tool.Name
 }

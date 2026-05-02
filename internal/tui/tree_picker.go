@@ -268,9 +268,6 @@ func (m treePickerModel) View(width, height int) string {
 
 	// Section label
 	b.WriteString(SectionLabel(p, "Pick what to install", fmt.Sprintf("%d selected", m.totalSelected()), contentW))
-	b.WriteByte('\n')
-	b.WriteString(lipgloss.NewStyle().Foreground(p.Muted).Italic(true).
-		Render("  Tabular bundles + tools. → expand · ← collapse · space toggle"))
 	b.WriteString("\n\n")
 
 	// Column header
@@ -305,13 +302,27 @@ func (m treePickerModel) View(width, height int) string {
 
 func (m treePickerModel) renderColumnHeader(contentW int) string {
 	p := m.palette
-	colStyle := lipgloss.NewStyle().Foreground(p.Muted).Bold(false)
-	return fmt.Sprintf("  %s  %s  %s  %s",
-		colStyle.Render("ID  "),
-		colStyle.Render(padRightPlain("BUNDLE / TOOL", 24)),
-		colStyle.Render(padRightPlain("STATE", 12)),
-		colStyle.Render("COUNT"),
+	colStyle := lipgloss.NewStyle().Foreground(p.Muted)
+	// Layout: cursor(2) + checkbox(4) + caret(2) + name(28) + status(rest)
+	return fmt.Sprintf("    %s %s %s %s",
+		colStyle.Render("    "),
+		colStyle.Render("  "),
+		colStyle.Render(padRightPlain("BUNDLE / TOOL", 28)),
+		colStyle.Render("STATUS"),
 	)
+}
+
+// checkbox returns a clear, dumb-obvious selection glyph.
+//   [ ] = none, [~] = partial (bundles), [✓] = all/selected
+func checkbox(p Palette, state string) string {
+	switch state {
+	case "all":
+		return lipgloss.NewStyle().Foreground(p.Primary).Bold(true).Render("[✓]")
+	case "partial":
+		return lipgloss.NewStyle().Foreground(p.Warn).Bold(true).Render("[~]")
+	default:
+		return lipgloss.NewStyle().Foreground(p.Subtle).Render("[ ]")
+	}
 }
 
 func padRightPlain(s string, n int) string {
@@ -332,73 +343,58 @@ func (m treePickerModel) renderRow(i int) string {
 	}
 
 	if row.kind == "bundle" {
-		return gutter + m.renderBundleRow(i, row)
+		return gutter + m.renderBundleRow(row)
 	}
-	return gutter + m.renderToolRow(i, row)
+	return gutter + m.renderToolRow(row)
 }
 
-func (m treePickerModel) renderBundleRow(_ int, row treeRow) string {
+// renderBundleRow:  [✓] ▼ DEFAULT                      22 tools · 22 selected
+func (m treePickerModel) renderBundleRow(row treeRow) string {
 	p := m.palette
 	bundle := m.findBundle(row.bundleID)
+	state := m.bundleSelectionState(bundle)
 
-	// ID column
-	idStr := bundleID2Num(m.bundles, bundle.ID)
-	idCol := lipgloss.NewStyle().Foreground(p.Muted).Render(fmt.Sprintf("%02d", idStr))
+	box := checkbox(p, state)
 	caret := "▶"
 	if m.expanded[bundle.ID] {
 		caret = "▼"
 	}
 	caretStyled := lipgloss.NewStyle().Foreground(p.Primary).Render(caret)
 
-	// Name (uppercase)
 	name := strings.ToUpper(bundle.Name)
 	nameStyle := lipgloss.NewStyle().Foreground(p.Text).Bold(true)
-	if state := m.bundleSelectionState(bundle); state == "all" || state == "partial" {
+	if state == "all" || state == "partial" {
 		nameStyle = nameStyle.Foreground(p.Primary)
 	}
 	nameRendered := nameStyle.Render(name)
-	nameCol := padName(nameRendered, name, 24)
+	nameCol := padName(nameRendered, name, 28)
 
-	// State dot
-	var dot string
-	switch m.bundleSelectionState(bundle) {
-	case "all":
-		dot = lipgloss.NewStyle().Foreground(p.Primary).Render("●")
-	case "partial":
-		dot = lipgloss.NewStyle().Foreground(p.Warn).Render("◐")
-	default:
-		dot = lipgloss.NewStyle().Foreground(p.Subtle).Render("○")
-	}
-	stateText := fmt.Sprintf("%d/%d", m.bundleSelectedCount(bundle), len(bundle.Tools))
-	stateRendered := dot + " " + lipgloss.NewStyle().Foreground(p.Muted).Render(stateText)
-	stateCol := padPlain(stateRendered, 12)
+	sel := m.bundleSelectedCount(bundle)
+	total := len(bundle.Tools)
+	statusText := fmt.Sprintf("%d tools · %d selected", total, sel)
+	status := lipgloss.NewStyle().Foreground(p.Muted).Render(statusText)
 
-	// Count
-	countCol := lipgloss.NewStyle().Foreground(p.Muted).Render(fmt.Sprintf("%d tools", len(bundle.Tools)))
-
-	return fmt.Sprintf("%s %s  %s  %s  %s", idCol, caretStyled, nameCol, stateCol, countCol)
+	return fmt.Sprintf("%s %s %s %s", box, caretStyled, nameCol, status)
 }
 
-func (m treePickerModel) renderToolRow(_ int, row treeRow) string {
+// renderToolRow: indented under parent. Checkbox sits flush with name —
+// no connector glyph, no ID column. Indent = bundle-checkbox width so
+// the tool checkbox visually nests one step in.
+func (m treePickerModel) renderToolRow(row treeRow) string {
 	p := m.palette
 	tool := m.findTool(row.bundleID, row.toolName)
 	selected := m.selected[row.bundleID+"/"+row.toolName]
 
-	// ID column: blank for tools (parent has it)
-	idCol := lipgloss.NewStyle().Foreground(p.Muted).Render("    ")
-
-	// Indent connector
-	connector := lipgloss.NewStyle().Foreground(p.Hairline).Render("└─")
-
-	// State dot (filled if selected)
-	var dot string
+	state := "none"
 	if selected {
-		dot = lipgloss.NewStyle().Foreground(p.Primary).Render("●")
-	} else {
-		dot = lipgloss.NewStyle().Foreground(p.Subtle).Render("○")
+		state = "all"
 	}
+	box := checkbox(p, state)
 
-	// Name
+	// 4-space indent: aligns the tool checkbox under the bundle's caret
+	// position (after [✓] + space). Keeps state→name visually attached.
+	indent := "    "
+
 	nameStyle := lipgloss.NewStyle().Foreground(p.Text)
 	if selected {
 		nameStyle = nameStyle.Foreground(p.Primary).Bold(true)
@@ -406,20 +402,17 @@ func (m treePickerModel) renderToolRow(_ int, row treeRow) string {
 	nameRendered := nameStyle.Render(tool.Name)
 	nameCol := padName(nameRendered, tool.Name, 22)
 
-	// State pill
-	var state string
+	var statePill string
 	if tool.Installed {
-		state = lipgloss.NewStyle().Foreground(p.Success).Render("v" + tool.Version)
+		statePill = lipgloss.NewStyle().Foreground(p.Success).Render("v" + tool.Version)
 	} else {
-		state = lipgloss.NewStyle().Foreground(p.Muted).Italic(true).Render("missing")
+		statePill = lipgloss.NewStyle().Foreground(p.Muted).Italic(true).Render("missing")
 	}
-	stateCol := padPlain(state, 12)
+	stateCol := padPlain(statePill, 12)
 
-	// Source
 	src := lipgloss.NewStyle().Foreground(p.Muted).Render(tool.Source)
 
-	return fmt.Sprintf("%s %s %s %s  %s  %s",
-		idCol, connector, dot, nameCol, stateCol, src)
+	return fmt.Sprintf("%s%s %s  %s %s", indent, box, nameCol, stateCol, src)
 }
 
 // bundleID2Num returns the 1-based ordinal of a bundle within the slice.

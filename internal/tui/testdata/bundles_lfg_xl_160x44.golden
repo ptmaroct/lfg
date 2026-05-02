@@ -14,23 +14,23 @@
                               ────────────────────────────────────────────────────────────────────────────────────────────────────                              
                                                                                                                                                                 
                               ┃ PICK WHAT TO INSTALL                                                                7 SELECTED                                  
-                                Tabular bundles + tools. → expand · ← collapse · space toggle                                                                   
                                                                                                                                                                 
-                                ID    BUNDLE / TOOL             STATE         COUNT                                                                             
+                                          BUNDLE / TOOL                STATUS                                                                                   
                                 ──────────────────────────────────────────────────────────────────────────────────────────────                                  
-                              ▸ 01 ▶  DEFAULT                   ◐ 7/22        22 tools                                                                          
-                                02 ▶  MAC-POWER-USER            ○ 0/9         9 tools                                                                           
-                                03 ▶  AI-CLIS                   ○ 0/3         3 tools                                                                           
-                                04 ▶  MEDIA                     ○ 0/5         5 tools                                                                           
-                                05 ▶  SKILLS-FRONTEND           ○ 0/2         2 tools                                                                           
-                                06 ▶  SKILLS-BACKEND            ○ 0/2         2 tools                                                                           
-                                07 ▶  SKILLS-AI                 ○ 0/2         2 tools                                                                           
+                              ▸ [~] ▶ DEFAULT                      22 tools · 7 selected                                                                        
+                                [ ] ▶ MAC-POWER-USER               9 tools · 0 selected                                                                         
+                                [ ] ▶ AI-CLIS                      3 tools · 0 selected                                                                         
+                                [ ] ▶ MEDIA                        5 tools · 0 selected                                                                         
+                                [ ] ▶ SKILLS-FRONTEND              2 tools · 0 selected                                                                         
+                                [ ] ▶ SKILLS-BACKEND               2 tools · 0 selected                                                                         
+                                [ ] ▶ SKILLS-AI                    2 tools · 0 selected                                                                         
                                 ──────────────────────────────────────────────────────────────────────────────────────────────                                  
                                                                                                                                                                 
                                                                                                                                                                 
                               ────────────────────────────────────────────────────────────────────────────────────────────────────                              
                                 [↑↓] NAV  [→←] TREE  [SP] TOGGLE  [A] ALL  [⏎] NEXT  [⎋] BACK                                                                   
                               ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛                              
+                                                                                                                                                                
                                                                                                                                                                 
                                                                                                                                                                 
                                                                                                                                                                 
