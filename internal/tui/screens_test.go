@@ -17,7 +17,14 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/ptmaroct/lfg/internal/preset"
 )
+
+// presetAllForTest returns the same hardcoded bundle data the TUI uses
+// in tests (preset.All). Hoisted to its own function so multiple tests
+// can share it without recreating the import dance.
+func presetAllForTest() []preset.Bundle { return preset.All() }
 
 var updateGolden = flag.Bool("update", false, "update golden files")
 
@@ -147,6 +154,42 @@ func TestSnapshot_QuitConfirm(t *testing.T) {
 		name := "quit_confirm_lfg_" + sz.name
 		t.Run(name, func(t *testing.T) {
 			driveAndSnapshot(t, name, ThemeLFG, sz, "q")
+		})
+	}
+}
+
+// TestSnapshot_Probe covers the first-paint detection screen. It bypasses
+// the standard driveAndSnapshot helper because `New(theme)` lands on
+// welcome (deterministic for the bundle-picker test) and the live
+// probeModel runs a goroutine. Constructing newProbe() directly without
+// calling Init() leaves the goroutine dormant, so we get a stable
+// "0 of N" initial frame.
+func TestSnapshot_Probe(t *testing.T) {
+	for _, sz := range sizes {
+		name := "probe_lfg_" + sz.name
+		t.Run(name, func(t *testing.T) {
+			pal := PaletteFor(ThemeLFG)
+			m := newProbe(pal, presetAllForTest())
+			got := m.View(sz.w, sz.h)
+
+			goldenPath := filepath.Join("testdata", name+".golden")
+			if *updateGolden {
+				if err := os.MkdirAll("testdata", 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(goldenPath, []byte(got), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				t.Logf("wrote %s (%d lines)", goldenPath, strings.Count(got, "\n"))
+				return
+			}
+			want, err := os.ReadFile(goldenPath)
+			if err != nil {
+				t.Fatalf("missing golden %s — run `go test ./internal/tui -update` first: %v", goldenPath, err)
+			}
+			if got != string(want) {
+				t.Errorf("snapshot diff for %s\n--- want\n%s\n--- got\n%s", name, want, got)
+			}
 		})
 	}
 }

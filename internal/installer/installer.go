@@ -76,6 +76,7 @@ func init() {
 	Register(&miseInstaller{})
 	Register(&npmInstaller{})
 	Register(&customInstaller{})
+	Register(&skillsInstaller{})
 	// brew handles both formulae and casks; "cask" routes through brew.
 	registry["cask"] = registry["brew"]
 }

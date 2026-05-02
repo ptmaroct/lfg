@@ -11,10 +11,12 @@
   02 ▶  MAC-POWER-USER            ○ 0/9         9 tools 
   03 ▶  AI-CLIS                   ○ 0/3         3 tools 
   04 ▶  MEDIA                     ○ 0/5         5 tools 
+  05 ▶  SKILLS-FRONTEND           ○ 0/2         2 tools 
+  06 ▶  SKILLS-BACKEND            ○ 0/2         2 tools 
+  07 ▶  SKILLS-AI                 ○ 0/2         2 tools 
   ──────────────────────────────────────────────────    
                                                         
                                                         
 ────────────────────────────────────────────────────────
   [↑↓] NAV  [→←] TREE  [SP] TOGGLE  [A] ALL  [⏎] NEXT  [⎋] BACK
 ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
-                                                               

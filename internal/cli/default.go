@@ -6,7 +6,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/ptmaroct/lfg/internal/detect"
 	"github.com/ptmaroct/lfg/internal/installer"
 	"github.com/ptmaroct/lfg/internal/preset"
 	"github.com/ptmaroct/lfg/internal/state"
@@ -26,13 +25,11 @@ func runTUI() error {
 		_ = state.Save(s) // soft-fail: don't block TUI startup on state-write
 	}
 
-	// Run detect concurrently across all preset tools so the picker
-	// reflects real installed state. ProbeAll fans out goroutines and
-	// is bounded per-tool by an internal timeout — usually completes
-	// in under a second on a warm system.
+	// Detection runs inside the TUI on the first screen (screenProbe) so
+	// the user sees animated progress instead of a frozen terminal while
+	// goroutines fan out. Probe finishes → transition to welcome with
+	// detect-applied bundles + the harness list set on the installer pkg.
 	bundles := preset.All()
-	results := detect.ProbeAll(bundles)
-	bundles = detect.Apply(bundles, results)
 
 	// In dry-run mode the TUI still walks every screen — the only
 	// difference is the install step uses the mock runner (canned lines,
@@ -45,7 +42,7 @@ func runTUI() error {
 	}
 
 	p := tea.NewProgram(
-		tui.NewWithBundles(theme, bundles, opts...),
+		tui.NewWithProbe(theme, bundles, opts...),
 		tea.WithAltScreen(),
 	)
 	final, err := p.Run()

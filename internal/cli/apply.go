@@ -55,6 +55,8 @@ func runApply(cmd *cobra.Command, args []string) error {
 		// a warm cache.
 		results := detect.ProbeAll(bundles)
 		bundles = detect.Apply(bundles, results)
+		// Route any "skills" steps to the harnesses actually present.
+		installer.SetHarnesses(detect.DetectedHarnesses())
 	}
 
 	// Build selection: every tool in every requested bundle, skipping

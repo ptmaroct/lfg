@@ -21,7 +21,6 @@ import (
 //   4. Two-column preview list (collapses to one column on narrow widths)
 //   5. huh.NewConfirm form (Title disabled — section label owns the
 //      headline, form just renders the buttons)
-//   6. Subtle prototype warning at the bottom
 type confirmModel struct {
 	palette   Palette
 	form      *huh.Form
@@ -127,10 +126,6 @@ func (m confirmModel) View(width, height int) string {
 
 	// huh form — buttons only. Section label already supplies headline.
 	b.WriteString("  " + m.form.View())
-
-	note := lipgloss.NewStyle().Foreground(p.Muted).Italic(true).
-		Render("  ⚠ UX prototype — installers mocked, no system change.")
-	b.WriteString("\n" + note)
 
 	return Frame(p, width, height,
 		"step 2/2 · confirm",

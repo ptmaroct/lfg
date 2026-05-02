@@ -128,6 +128,70 @@ func ProbeAll(bundles []preset.Bundle) map[string]Result {
 	return results
 }
 
+// ProbeStep is one streamed probe outcome. Emitted by ProbeAllStream
+// once per tool so the TUI can show live progress instead of the
+// single-shot ProbeAll waiting silently.
+type ProbeStep struct {
+	Key    string
+	Tool   preset.Tool
+	Result Result
+}
+
+// ProbeAllStream fans out probes like ProbeAll but emits each completion
+// on `out`, closing the channel when all probes finish. Buffer `out`
+// generously (≥ total tool count) or the goroutines will block. Use
+// Apply on the bundles + the collected results map for the final shape.
+func ProbeAllStream(bundles []preset.Bundle, out chan<- ProbeStep) {
+	type job struct {
+		key string
+		t   preset.Tool
+	}
+	var jobs []job
+	for _, b := range bundles {
+		for _, t := range b.Tools {
+			jobs = append(jobs, job{key: b.ID + "/" + t.Name, t: t})
+		}
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(len(jobs))
+	for _, j := range jobs {
+		go func(j job) {
+			defer wg.Done()
+			out <- ProbeStep{Key: j.key, Tool: j.t, Result: Probe(j.t)}
+		}(j)
+	}
+	wg.Wait()
+	close(out)
+}
+
+// harnessProbes lists the AI harnesses we can pass to `npx skills add -a`.
+// Each entry maps the npx-skills agent name to the binary we LookPath for.
+// Order is the priority order presented to the skills CLI when multiple
+// harnesses are present — claude-code first since it's the lfg default.
+var harnessProbes = []struct {
+	Agent  string // -a flag value for `npx skills add`
+	Binary string // binary to LookPath
+}{
+	{Agent: "claude-code", Binary: "claude"},
+	{Agent: "codex", Binary: "codex"},
+	{Agent: "opencode", Binary: "opencode"},
+}
+
+// DetectedHarnesses returns the npx-skills agent names corresponding to
+// AI harness binaries currently on PATH. Empty result is possible when
+// none of the supported harnesses are installed; callers should fall
+// back to a default (the skills installer uses claude-code).
+func DetectedHarnesses() []string {
+	var found []string
+	for _, h := range harnessProbes {
+		if _, err := exec.LookPath(h.Binary); err == nil {
+			found = append(found, h.Agent)
+		}
+	}
+	return found
+}
+
 // Apply overlays detect results onto bundle data, returning a new slice
 // with Tool.Installed / Tool.Version reflecting reality. Pure — does not
 // mutate input. Tools missing from results retain their preset values

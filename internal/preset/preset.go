@@ -12,12 +12,13 @@ package preset
 type Tool struct {
 	Name         string // display name
 	Description  string // short blurb
-	Source       string // brew / cask / apt / mise / npm / curl / custom
+	Source       string // brew / cask / apt / mise / npm / curl / custom / skills
 	Installed    bool   // populated by detect pass; hardcoded for UX demo
 	Version      string // e.g. "2.42.0" when Installed == true
 	InstallMac   string // shell command for macOS
 	InstallLinux string // shell command for Debian/Ubuntu Linux
 	Binary       string // binary name to detect (defaults to Name if empty)
+	SkillURL     string // git URL for Source="skills" entries (passed to `npx skills add`)
 }
 
 // Bundle is a named group of tools the user can toggle on/off.
@@ -158,6 +159,50 @@ func All() []Bundle {
 					InstallMac: "brew install poppler", InstallLinux: "sudo apt-get install -y poppler-utils"},
 				{Name: "exiftool", Source: "brew",
 					InstallMac: "brew install exiftool", InstallLinux: "sudo apt-get install -y libimage-exiftool-perl"},
+			},
+		},
+		// Skill bundles — installed via `npx skills add` (Source: "skills")
+		// into the harnesses detected on the host (Claude Code, Codex,
+		// OpenCode). URLs below are placeholders the maintainer fills with
+		// real skill repos before merge. Defaults to false so they don't
+		// surprise existing users — opt-in via the tree picker.
+		{
+			ID:          "skills-frontend",
+			Name:        "skills-frontend",
+			Description: "Frontend skills (browser agent, design, etc.)",
+			Tools: []Tool{
+				{Name: "agent-browser", Source: "skills",
+					Description: "Headless-browser agent skill",
+					SkillURL:    "https://github.com/PLACEHOLDER/agent-browser"},
+				{Name: "frontend-design", Source: "skills",
+					Description: "UI/design review skill",
+					SkillURL:    "https://github.com/PLACEHOLDER/frontend-design"},
+			},
+		},
+		{
+			ID:          "skills-backend",
+			Name:        "skills-backend",
+			Description: "Backend skills (db, api, infra)",
+			Tools: []Tool{
+				{Name: "db-introspect", Source: "skills",
+					Description: "Database schema introspection skill",
+					SkillURL:    "https://github.com/PLACEHOLDER/db-introspect"},
+				{Name: "api-review", Source: "skills",
+					Description: "REST/GraphQL API review skill",
+					SkillURL:    "https://github.com/PLACEHOLDER/api-review"},
+			},
+		},
+		{
+			ID:          "skills-ai",
+			Name:        "skills-ai",
+			Description: "AI workflow skills (eval, prompt, RAG)",
+			Tools: []Tool{
+				{Name: "portless", Source: "skills",
+					Description: "vercel-labs/portless tunnel skill (example)",
+					SkillURL:    "https://github.com/vercel-labs/portless"},
+				{Name: "prompt-eval", Source: "skills",
+					Description: "Prompt eval harness skill",
+					SkillURL:    "https://github.com/PLACEHOLDER/prompt-eval"},
 			},
 		},
 	}
