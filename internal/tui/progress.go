@@ -217,8 +217,24 @@ func (m progressModel) Update(msg tea.Msg) (progressModel, tea.Cmd) {
 			m.logs = append(m.logs, fmt.Sprintf("%s  %-26s  %s", status, short, suffix))
 		case "stdout", "stderr":
 			if l.Text != "" {
+				// Prefix every stream line with the short tool name so a
+				// fast scan groups output per tool. Without this, a busy
+				// tail mixed mise + node-lts + npm output and the user
+				// couldn't tell which tool emitted which line. Bundle
+				// prefix stripped (`barebones/mise` → `mise`) to keep
+				// the column tight.
 				dot := lipgloss.NewStyle().Foreground(m.palette.Subtle).Render("·")
-				m.logs = append(m.logs, fmt.Sprintf("%s  %s", dot, truncate(l.Text, 60)))
+				tagStyle := lipgloss.NewStyle().Foreground(m.palette.Accent)
+				tag := tagStyle.Render(fmt.Sprintf("%-14s", shortTool(l.Tool)))
+				m.logs = append(m.logs, fmt.Sprintf("%s  %s  %s", dot, tag, truncate(l.Text, 50)))
+			}
+		case "meta":
+			if l.Text != "" {
+				dot := lipgloss.NewStyle().Foreground(m.palette.Subtle).Render("·")
+				tagStyle := lipgloss.NewStyle().Foreground(m.palette.Accent)
+				tag := tagStyle.Render(fmt.Sprintf("%-14s", shortTool(l.Tool)))
+				metaStyle := lipgloss.NewStyle().Foreground(m.palette.Muted).Italic(true)
+				m.logs = append(m.logs, fmt.Sprintf("%s  %s  %s", dot, tag, metaStyle.Render(truncate(l.Text, 50))))
 			}
 		}
 		if len(m.logs) > 8 {
@@ -276,6 +292,23 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return s[:n-1] + "…"
+}
+
+// shortTool strips the bundle prefix off install keys ("barebones/mise"
+// → "mise") and clamps to 14 cols so the per-line task tag stays in a
+// fixed column. Empty input returns "—" so meta lines emitted without
+// a tool (rare) still align.
+func shortTool(s string) string {
+	if s == "" {
+		return "—"
+	}
+	if i := strings.LastIndex(s, "/"); i >= 0 {
+		s = s[i+1:]
+	}
+	if len(s) > 14 {
+		s = s[:13] + "…"
+	}
+	return s
 }
 
 func (m progressModel) View(width, height int) string {

@@ -60,16 +60,50 @@ func (s skillsInstaller) DryRun(t preset.Tool) string { return skillsCommand(t) 
 
 // skillsCommand renders the npx invocation for one skill Tool. Returns
 // empty string when SkillURL is missing — caller treats that as an error.
+//
+// Harness list is resolved LIVE at command-build time (not from the
+// cached probe at TUI startup). Reason: when the user installs codex /
+// opencode in the same run as their skills, detect at TUI startup ran
+// before those CLIs existed and cached an incomplete harness list —
+// the resulting `npx skills add` ran with only `-a claude-code` and
+// the skills never landed in `~/.codex/skills`. Re-probing here picks
+// up the harnesses already installed by earlier steps in this run.
 func skillsCommand(t preset.Tool) string {
 	if t.SkillURL == "" {
 		return ""
 	}
 	parts := []string{"npx", "skills", "add", t.SkillURL,
 		"--skill", t.Name, "-g", "-y", "--copy"}
-	for _, h := range getHarnesses() {
+	harnesses := liveHarnesses()
+	if len(harnesses) == 0 {
+		// Nothing on PATH right now — fall back to cached list (may
+		// have been seeded by detect or by an explicit SetHarnesses
+		// from tests).
+		harnesses = getHarnesses()
+	}
+	for _, h := range harnesses {
 		parts = append(parts, "-a", h)
 	}
 	return strings.Join(parts, " ")
+}
+
+// liveHarnesses probes for AI-harness CLIs on PATH right now. Mirrors
+// the table in internal/detect/detect.go but lives here too to avoid an
+// installer→detect import (detect already imports preset; we keep the
+// dep graph one-way). Keep the lists in sync.
+func liveHarnesses() []string {
+	candidates := []struct{ agent, bin string }{
+		{"claude-code", "claude"},
+		{"codex", "codex"},
+		{"opencode", "opencode"},
+	}
+	var out []string
+	for _, c := range candidates {
+		if _, err := exec.LookPath(c.bin); err == nil {
+			out = append(out, c.agent)
+		}
+	}
+	return out
 }
 
 // SetHarnesses configures the agents the skills backend will pass via
