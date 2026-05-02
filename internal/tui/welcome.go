@@ -161,7 +161,9 @@ func (m welcomeModel) renderChoice(i int, c welcomeChoice, contentW int) string 
 	}
 
 	line1 := gutter + num + "  " + titleStyle.Render(c.label)
-	line2 := "       " + descStyle.Render(c.desc)
+	// Description sits exactly under the label: gutter(2) + num(2) +
+	// gap(2) = 6 spaces before label starts, so 6 before desc too.
+	line2 := strings.Repeat(" ", 6) + descStyle.Render(c.desc)
 	_ = contentW
 	return line1 + "\n" + line2
 }

@@ -422,19 +422,33 @@ func (m treePickerModel) View(width, height int) string {
 	)
 }
 
+// Strict grid widths shared by the header, bundle row, and tool row.
+// Anything that prints inside one of these columns must use the same
+// width so the columns visually line up regardless of row type.
+const (
+	gridGutterW = 2  // "▸ " cursor or "  " padding
+	gridBoxW    = 3  // [✓] / [~] / [ ] / [●]
+	gridSpace   = 1  // separator between box and caret
+	gridCaretW  = 1  // ▶ ▼ (bundle) or "·" (tool)
+	gridSpace2  = 1  // separator between caret and name
+	gridNameW   = 22
+	gridGap     = 2 // gap between name and INSTALLED column
+	gridStatusW = 12
+)
+
+// gridLeading is the column offset before the NAME column starts.
+// Used by the header to align with bundle/tool row content.
+const gridLeading = gridGutterW + gridBoxW + gridSpace + gridCaretW + gridSpace2
+
 func (m treePickerModel) renderColumnHeader(contentW int) string {
 	p := m.palette
-	colStyle := lipgloss.NewStyle().Foreground(p.Muted)
-	// Offsets match renderToolRow (the only row that renders the
-	// INSTALLED + VIA columns):
-	//   gutter(2) + indent(4) + [✓](3) + space(1) = 10 spaces before name,
-	//   then padRightPlain(22) name, then "  " gap, then 12-wide installed,
-	//   then " " + via.
-	return fmt.Sprintf("          %s  %s %s",
-		colStyle.Render(padRightPlain("BUNDLE / TOOL", 22)),
-		colStyle.Render(padRightPlain("INSTALLED", 12)),
-		colStyle.Render("VIA"),
-	)
+	style := lipgloss.NewStyle().Foreground(p.Muted)
+	return strings.Repeat(" ", gridLeading) +
+		style.Render(padRightPlain("BUNDLE / TOOL", gridNameW)) +
+		strings.Repeat(" ", gridGap) +
+		style.Render(padRightPlain("INSTALLED", gridStatusW)) +
+		" " +
+		style.Render("VIA")
 }
 
 // checkbox returns a clear, dumb-obvious selection glyph.
@@ -488,16 +502,22 @@ func (m treePickerModel) renderRow(i int) string {
 	}
 }
 
-// renderSubheaderRow — small label introducing the "ALREADY INSTALLED"
-// group inside an expanded bundle. Dim, italic, indented under the
-// bundle's checkbox column so it visually nests.
+// renderSubheaderRow — dim italic divider introducing the "ALREADY
+// INSTALLED" group inside an expanded bundle. Aligned with the grid's
+// NAME column so it sits cleanly above the rows it labels.
 func (m treePickerModel) renderSubheaderRow(row treeRow) string {
 	p := m.palette
 	style := lipgloss.NewStyle().Foreground(p.Muted).Italic(true)
-	return "    " + style.Render(row.label)
+	// gridLeading - gridGutterW because gutter is added by renderRow.
+	return strings.Repeat(" ", gridLeading-gridGutterW) + style.Render(row.label)
 }
 
-// renderBundleRow:  [✓] ▼ DEFAULT                      22 tools · 22 selected
+// renderBundleRow uses the strict shared grid:
+//
+//	[box] [caret] NAME(22)  STATUS(rest of line)
+//
+// Status fills the INSTALLED + VIA columns (it's a single string for
+// bundle rows since they don't have per-tool version/source).
 func (m treePickerModel) renderBundleRow(row treeRow) string {
 	p := m.palette
 	bundle := m.findBundle(row.bundleID)
@@ -512,21 +532,20 @@ func (m treePickerModel) renderBundleRow(row treeRow) string {
 
 	name := strings.ToUpper(bundle.Name)
 	nameStyle := lipgloss.NewStyle().Foreground(p.Text).Bold(true)
-	if state == "all" || state == "partial" {
+	switch state {
+	case "all", "partial":
 		nameStyle = nameStyle.Foreground(p.Primary)
+	case "done":
+		nameStyle = nameStyle.Foreground(p.Muted) // recede
 	}
 	nameRendered := nameStyle.Render(name)
-	nameCol := padName(nameRendered, name, 28)
+	nameCol := padName(nameRendered, name, gridNameW)
 
 	pending := m.bundlePendingTotal(bundle)
 	installed := m.bundleInstalledCount(bundle)
 	sel := m.bundleSelectedCount(bundle)
 	total := len(bundle.Tools)
 
-	// Tight stat strings so the bundle row fits on one line and doesn't
-	// collide with the INSTALLED/VIA columns when those aren't on this
-	// row. Order: picked count first (the action item), then a softer
-	// "(N installed)" tail when relevant.
 	var statusText string
 	switch {
 	case pending == 0:
@@ -538,16 +557,18 @@ func (m treePickerModel) renderBundleRow(row treeRow) string {
 	}
 	status := lipgloss.NewStyle().Foreground(p.Muted).Render(statusText)
 
-	return fmt.Sprintf("%s %s %s %s", box, caretStyled, nameCol, status)
+	// box + space + caret + space + name + gap + status (free-form, fills rest)
+	return box + " " + caretStyled + " " + nameCol + strings.Repeat(" ", gridGap) + status
 }
 
-// renderToolRow: indented under parent. Checkbox sits flush with name —
-// no connector glyph, no ID column. Indent = bundle-checkbox width so
-// the tool checkbox visually nests one step in.
+// renderToolRow uses the same strict grid as bundle rows so columns
+// line up. Tools occupy the bundle's caret column with a thin "·"
+// connector instead — visual nesting without a separate indent that
+// would offset every column rightward.
 //
-// Columns: [✓] name  current-version  source
-//   - "current-version" is what's *installed now* (— when not present)
-//   - "source" is the install backend (brew/mise/npm/curl/skills)
+// Columns: [box] · NAME(22)  CURRENT(12) VIA
+//   - CURRENT = version installed now (— when missing)
+//   - VIA     = installer backend (brew/mise/npm/curl/skills)
 func (m treePickerModel) renderToolRow(row treeRow) string {
 	p := m.palette
 	tool := m.findTool(row.bundleID, row.toolName)
@@ -556,7 +577,7 @@ func (m treePickerModel) renderToolRow(row treeRow) string {
 	var box string
 	switch {
 	case tool.Installed:
-		box = checkbox(p, "done") // muted [✓] — recedes into background
+		box = checkbox(p, "done")
 	case tool.Mandatory:
 		box = checkbox(p, "mandatory")
 	case selected:
@@ -565,22 +586,20 @@ func (m treePickerModel) renderToolRow(row treeRow) string {
 		box = checkbox(p, "none")
 	}
 
-	// 4-space indent: aligns the tool checkbox under the bundle's caret
-	// position (after [✓] + space). Keeps state→name visually attached.
-	indent := "    "
+	// "·" sits where bundle rows put the caret — keeps the column grid
+	// stable and gives a subtle nesting cue without a 4-space indent.
+	connector := lipgloss.NewStyle().Foreground(p.Subtle).Render("·")
 
 	nameStyle := lipgloss.NewStyle().Foreground(p.Text)
 	switch {
 	case tool.Installed:
-		nameStyle = nameStyle.Foreground(p.Muted) // recede
+		nameStyle = nameStyle.Foreground(p.Muted)
 	case selected:
 		nameStyle = nameStyle.Foreground(p.Primary).Bold(true)
 	}
 	nameRendered := nameStyle.Render(tool.Name)
-	nameCol := padName(nameRendered, tool.Name, 22)
+	nameCol := padName(nameRendered, tool.Name, gridNameW)
 
-	// "current" column: installed version, or em-dash when missing.
-	// Muted (not Success-green) so the installed grid doesn't shout.
 	var current string
 	if tool.Installed {
 		v := tool.Version
@@ -593,7 +612,7 @@ func (m treePickerModel) renderToolRow(row treeRow) string {
 	} else {
 		current = lipgloss.NewStyle().Foreground(p.Subtle).Render("—")
 	}
-	currentCol := padPlain(current, 12)
+	currentCol := padPlain(current, gridStatusW)
 
 	srcColor := p.Muted
 	if tool.Installed {
@@ -601,7 +620,9 @@ func (m treePickerModel) renderToolRow(row treeRow) string {
 	}
 	src := lipgloss.NewStyle().Foreground(srcColor).Render(tool.Source)
 
-	return fmt.Sprintf("%s%s %s  %s %s", indent, box, nameCol, currentCol, src)
+	// box + space + connector + space + name + gap + current + space + src
+	return box + " " + connector + " " + nameCol +
+		strings.Repeat(" ", gridGap) + currentCol + " " + src
 }
 
 // bundleID2Num returns the 1-based ordinal of a bundle within the slice.
