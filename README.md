@@ -5,31 +5,42 @@
 `lfg` is an opinionated, open-source TUI that bootstraps a fresh Mac or
 Linux dev box — installs the tools you pick, restores your dotfiles, and
 (eventually) distributes your SSH identity to the servers you already
-trust. One `curl | sh` away on day one; one command to backup what you
-have on day N.
-
-**Status:** v0.1 ship — installers, detect, backup, doctor, and
-self-update are all live. The TUI shells out to brew/apt/mise/npm
-and streams output into the log tail. Snapshot tests still see a
-deterministic mock so test runs don't touch your system.
+trust. One `curl | sh` on day one; one command to back up the box on day N.
 
 ![welcome](assets/welcome.png)
 
-## Why
+## Install
 
-Setting up a fresh machine eats a full evening:
+```sh
+curl -fsSL https://raw.githubusercontent.com/ptmaroct/lfg/main/install.sh | sh
+```
 
-1. Install Homebrew, mise, node, bun, go, …
-2. Pull your dotfiles from somewhere.
-3. Copy your SSH config, regenerate keys, add them to every server.
-4. Tune a dozen macOS preferences.
-5. Miss two of them, notice next Tuesday.
+Drops `lfg` in `/usr/local/bin` (or `~/.local/bin` when /usr/local
+isn't writable). Override prefix or pin a version:
 
-Existing tools solve parts of this (chezmoi, Omakub, dotbot, Nix). None
-do the whole thing with a friendly interactive UI. `lfg` wraps the
-best-in-class primitives — Homebrew, mise, chezmoi, age — in a
-[Charm](https://charm.sh) TUI so the first five minutes on a new box
-feel great.
+```sh
+LFG_VERSION=v0.3.0 LFG_PREFIX=$HOME/.local sh install.sh
+```
+
+From source (Go 1.25+):
+
+```sh
+git clone https://github.com/ptmaroct/lfg
+cd lfg && go build -o lfg ./cmd/lfg && ./lfg
+```
+
+## Quick start
+
+```sh
+lfg                # launch TUI
+lfg --theme=dracula
+lfg apply barebones                # headless install of one bundle
+lfg backup                         # snapshot dotfiles + configs
+lfg --config ./my-preset.toml      # load custom bundles
+```
+
+`--dry-run` (or `-n`) walks every flow without exec'ing anything. Theme
+persists in `~/.config/lfg/state.json`.
 
 ## Screens
 
@@ -75,45 +86,41 @@ name is shown in the top-right of every screen so cycles are visible.
 1. **Welcome** — pick install or backup. Logo gradient sweeps live.
 2. **Tree picker** — expand a bundle (→), toggle individual tools
    (space), or toggle a whole bundle. `a` toggles everything.
-3. **Confirm** — telemetry-style summary: total to install, already
-   present, source breakdown (brew · mise · custom).
-4. **Progress** — gradient bar, spinner, log tail, elapsed timer.
-5. **Done** — next-steps card.
+3. **Confirm** — summary of total to install, already present, source
+   breakdown (brew · mise · npm · curl · skills).
+4. **Progress** — gradient bar, spinner, per-task log tail, elapsed timer.
+5. **Done** — reload-shell command + next-steps card.
 
-Backup flow: `huh.Confirm` for encrypt y/n → spinner → `.tar[.age]`
-result with key-backup reminder.
+Backup flow: encrypt y/n → spinner → `.tar[.age]` result with
+key-backup reminder. Press `q` for quit-confirm, `Ctrl+T` to cycle theme.
 
-Press `q` from any screen → quit-confirm dialog.
-Press `Ctrl+T` from any screen → cycle theme.
+## Why
 
-## Install
+Setting up a fresh machine eats a full evening:
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/ptmaroct/lfg/main/install.sh | sh
-```
+1. Install Homebrew, mise, node, bun, go, …
+2. Pull your dotfiles from somewhere.
+3. Copy your SSH config, regenerate keys, add them to every server.
+4. Tune a dozen macOS preferences.
+5. Miss two of them, notice next Tuesday.
 
-The script grabs the latest release tarball for your OS/arch from
-GitHub, drops the `lfg` binary in `/usr/local/bin` (or `~/.local/bin`
-when /usr/local isn't writable). Override prefix or pin a version:
+Existing tools solve parts of this (chezmoi, Omakub, dotbot, Nix). None
+do the whole thing with a friendly interactive UI. `lfg` wraps the
+best-in-class primitives — Homebrew, mise, chezmoi, age — in a
+[Charm](https://charm.sh) TUI so the first five minutes on a new box
+feel great.
 
-```sh
-LFG_VERSION=v0.1.0 LFG_PREFIX=$HOME/.local sh install.sh
-```
-
-Building from source needs Go 1.25+:
-
-```sh
-git clone https://github.com/ptmaroct/lfg
-cd lfg
-go build -o lfg ./cmd/lfg
-./lfg
-```
+**Status:** v0.3 ship — installers + PATH augmentation + PostInstall
+hooks + live version resolution from upstream registries are live.
+Snapshot tests still see a deterministic mock so test runs don't touch
+your system.
 
 ## Usage
 
 ```sh
 lfg                              # launch TUI (default theme)
 lfg --theme=dracula              # explicit theme override
+lfg --debug                      # verbose log → ~/.config/lfg/logs/debug-<ts>.log
 lfg apply barebones              # headless install of one bundle
 lfg apply barebones dev-tools    # multiple bundles, non-interactively
 lfg backup                       # snapshot dotfiles + configs (locked by default)
@@ -135,8 +142,6 @@ lfg apply -n barebones     # print planned commands, exec nothing
 lfg backup -n              # list source counts + would-be filename, write nothing
 lfg export -n              # print the path it would write, no file created
 ```
-
-Theme persists in `~/.config/lfg/state.json` so `--theme` is only needed once.
 
 ### Key bindings
 
