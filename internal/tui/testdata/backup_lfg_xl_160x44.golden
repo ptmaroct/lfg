@@ -13,20 +13,20 @@
                                                                                                                                                                 
                                                                                                                                                                 
                                                                                                                                                                 
-                                                                                                                                                                
                               ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓                              
-                                ▌ lfg │ BACKUP                                                                                                                  
+                                ▌ lfg │ LOAD CONFIG                                                                                                             
                               ────────────────────────────────────────────────────────────────────────────────────────────────────                              
                                                                                                                                                                 
-                              Encrypt the backup?                                                                                                               
-                              Encrypted = .tar.age (age). Plain = .tar.gz, no secrets.                                                                          
+                              ┃ LOAD PRESET                                                          LOCAL FILE OR HTTP(S) URL                                  
                                                                                                                                                                 
-                                               .tar.age     .tar.gz                                                                                             
+                                Paste a TOML preset path. We'll fetch + parse it, then run detect.                                                              
+                                                                                                                                                                
+                                › /path/to/preset.toml or https://example.com/preset.toml                                                                       
+                                                                                                                                                                
                                                                                                                                                                 
                               ────────────────────────────────────────────────────────────────────────────────────────────────────                              
-                                [←→] SWITCH  [⏎] CONFIRM  [⎋] BACK                                                                                              
+                                [⏎] LOAD  [⎋] BACK                                                                                                              
                               ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛                              
-                                                                                                                                                                
                                                                                                                                                                 
                                                                                                                                                                 
                                                                                                                                                                 

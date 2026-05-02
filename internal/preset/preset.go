@@ -1,208 +1,159 @@
-// Package preset holds hardcoded bundle data for the MVP UX prototype.
-// In v0.1+ this will fetch TOML from raw.githubusercontent.com.
+// Package preset holds the bundle/tool data model and the built-in
+// preset shipped with lfg. v0.1+ supports loading custom presets via
+// preset.Load — see loader.go.
 package preset
 
 // Tool represents a single installable item.
 //
 // InstallMac and InstallLinux capture the platform-specific install
-// command(s). When the real installer pass lands these will be the
-// shell commands actually run (after detection / dry-run preview).
-// Sourced from each tool's official docs (verified via perplexity for
-// AI CLIs).
+// command(s). Detect populates Installed/Version at runtime based on
+// what's actually present on the host.
 type Tool struct {
-	Name         string // display name
-	Description  string // short blurb
-	Source       string // brew / cask / apt / mise / npm / curl / custom / skills
-	Installed    bool   // populated by detect pass; hardcoded for UX demo
-	Version      string // e.g. "2.42.0" when Installed == true
-	InstallMac   string // shell command for macOS
-	InstallLinux string // shell command for Debian/Ubuntu Linux
-	Binary       string // binary name to detect (defaults to Name if empty)
-	SkillURL     string // git URL for Source="skills" entries (passed to `npx skills add`)
+	Name         string `toml:"name"`
+	Description  string `toml:"description,omitempty"`
+	Source       string `toml:"source"` // brew / cask / apt / mise / npm / curl / custom / skills
+	Installed    bool   `toml:"-"`      // populated by detect pass; never serialized
+	Version      string `toml:"-"`      // populated by detect pass; never serialized
+	InstallMac   string `toml:"install_mac,omitempty"`
+	InstallLinux string `toml:"install_linux,omitempty"`
+	Binary       string `toml:"binary,omitempty"`    // binary on PATH; defaults to Name
+	SkillURL     string `toml:"skill_url,omitempty"` // for Source="skills"
+	// Mandatory rows can't be unselected in the tree picker. Used for
+	// hard dependencies like Homebrew that other tools build on.
+	Mandatory bool `toml:"mandatory,omitempty"`
 }
 
 // Bundle is a named group of tools the user can toggle on/off.
 type Bundle struct {
-	ID          string
-	Name        string
-	Description string
-	Default     bool
-	Tools       []Tool
+	ID          string `toml:"id"`
+	Name        string `toml:"name"`
+	Description string `toml:"description,omitempty"`
+	Default     bool   `toml:"default,omitempty"`
+	Tools       []Tool `toml:"tools"`
 }
 
-// All returns the bundles shipped with the CLI. Hardcoded for prototype.
+// All returns the bundles shipped with the CLI by default. Three
+// bundles: barebones (universal foundation), dev-tools (AI coding
+// CLIs), skills (cross-harness skill packs).
 func All() []Bundle {
 	return []Bundle{
 		{
-			ID:          "default",
-			Name:        "default",
-			Description: "Universal dev starter (~20 tools)",
+			ID:          "barebones",
+			Name:        "barebones",
+			Description: "Universal foundation: Homebrew, Node, Python, runtime managers",
 			Default:     true,
 			Tools: []Tool{
-				{Name: "git", Source: "brew", Installed: true, Version: "2.42.0",
-					InstallMac: "brew install git", InstallLinux: "sudo apt-get install -y git"},
-				{Name: "gh", Source: "brew", Installed: true, Version: "2.54.0",
-					InstallMac: "brew install gh", InstallLinux: "sudo apt-get install -y gh"},
-				{Name: "fzf", Source: "brew", Installed: true, Version: "0.55.0",
-					InstallMac: "brew install fzf", InstallLinux: "sudo apt-get install -y fzf"},
-				{Name: "ripgrep", Source: "brew", Binary: "rg",
-					InstallMac: "brew install ripgrep", InstallLinux: "sudo apt-get install -y ripgrep"},
-				{Name: "bat", Source: "brew", Installed: true, Version: "0.24.0",
-					InstallMac: "brew install bat", InstallLinux: "sudo apt-get install -y bat"},
-				{Name: "eza", Source: "brew", Installed: true, Version: "0.18.0",
-					InstallMac: "brew install eza", InstallLinux: "sudo apt-get install -y eza"},
-				{Name: "fd", Source: "brew", Installed: true, Version: "9.0.0",
-					InstallMac: "brew install fd", InstallLinux: "sudo apt-get install -y fd-find"},
-				{Name: "zoxide", Source: "brew", Installed: true, Version: "0.9.4",
-					InstallMac: "brew install zoxide", InstallLinux: "sudo apt-get install -y zoxide"},
-				{Name: "jq", Source: "brew", Installed: true, Version: "1.7.1",
-					InstallMac: "brew install jq", InstallLinux: "sudo apt-get install -y jq"},
-				{Name: "tree", Source: "brew",
-					InstallMac: "brew install tree", InstallLinux: "sudo apt-get install -y tree"},
-				{Name: "tmux", Source: "brew", Installed: true, Version: "3.4",
-					InstallMac: "brew install tmux", InstallLinux: "sudo apt-get install -y tmux"},
-				{Name: "lazygit", Source: "brew", Installed: true, Version: "0.43.0",
-					InstallMac:   "brew install lazygit",
-					InstallLinux: "sudo add-apt-repository -y ppa:lazygit-team/release && sudo apt-get install -y lazygit"},
-				{Name: "btop", Source: "brew", Installed: true, Version: "1.3.2",
-					InstallMac: "brew install btop", InstallLinux: "sudo apt-get install -y btop"},
-				{Name: "glow", Source: "brew", Installed: true, Version: "2.0.0",
-					InstallMac: "brew install glow", InstallLinux: "sudo apt-get install -y glow"},
-				{Name: "yazi", Source: "brew", Installed: true, Version: "0.3.0",
-					InstallMac: "brew install yazi", InstallLinux: "cargo install --locked yazi-fm yazi-cli"},
-				{Name: "mise", Source: "brew", Installed: true, Version: "2024.9",
-					InstallMac: "brew install mise", InstallLinux: "curl -fsSL https://mise.run | sh"},
-				{Name: "starship", Source: "custom",
-					InstallMac:   "curl -sS https://starship.rs/install.sh | sh -s -- -y",
-					InstallLinux: "curl -sS https://starship.rs/install.sh | sh -s -- -y"},
-				{Name: "node (lts)", Source: "mise", Binary: "node",
-					InstallMac: "mise use -g node@lts", InstallLinux: "mise use -g node@lts"},
-				{Name: "bun", Source: "mise",
-					InstallMac: "mise use -g bun@latest", InstallLinux: "mise use -g bun@latest"},
-				{Name: "pnpm", Source: "mise",
-					InstallMac: "mise use -g pnpm@latest", InstallLinux: "mise use -g pnpm@latest"},
-				{Name: "uv", Source: "mise",
-					InstallMac: "mise use -g uv@latest", InstallLinux: "mise use -g uv@latest"},
-				{Name: "go", Source: "mise", Installed: true, Version: "1.26.0",
-					InstallMac: "mise use -g go@latest", InstallLinux: "mise use -g go@latest"},
+				// Homebrew — mandatory. Other tools install via brew.
+				{
+					Name: "brew", Source: "custom", Binary: "brew", Mandatory: true,
+					Description:  "Homebrew package manager — required by everything below",
+					InstallMac:   `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`,
+					InstallLinux: `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`,
+				},
+				// Runtime managers + language runtimes.
+				{
+					Name: "mise", Source: "brew", Binary: "mise",
+					Description:  "Polyglot runtime manager (replaces nvm/pyenv/rbenv)",
+					InstallMac:   "brew install mise",
+					InstallLinux: "curl -fsSL https://mise.run | sh",
+				},
+				{
+					Name: "node-lts", Source: "mise", Binary: "node",
+					Description:  "Node.js LTS via mise",
+					InstallMac:   "mise use -g node@lts",
+					InstallLinux: "mise use -g node@lts",
+				},
+				{
+					Name: "pnpm", Source: "mise", Binary: "pnpm",
+					InstallMac:   "mise use -g pnpm@latest",
+					InstallLinux: "mise use -g pnpm@latest",
+				},
+				{
+					Name: "bun", Source: "mise", Binary: "bun",
+					InstallMac:   "mise use -g bun@latest",
+					InstallLinux: "mise use -g bun@latest",
+				},
+				{
+					Name: "yarn", Source: "npm", Binary: "yarn",
+					Description:  "Yarn classic via corepack-style global install",
+					InstallMac:   "npm install -g yarn",
+					InstallLinux: "npm install -g yarn",
+				},
+				{
+					Name: "python", Source: "mise", Binary: "python",
+					Description:  "Python latest via mise",
+					InstallMac:   "mise use -g python@latest",
+					InstallLinux: "mise use -g python@latest",
+				},
+				{
+					Name: "uv", Source: "custom", Binary: "uv",
+					Description:  "Astral uv — fast Python package manager",
+					InstallMac:   "curl -LsSf https://astral.sh/uv/install.sh | sh",
+					InstallLinux: "curl -LsSf https://astral.sh/uv/install.sh | sh",
+				},
 			},
 		},
 		{
-			ID:          "mac-power-user",
-			Name:        "mac-power-user",
-			Description: "Mac CLI utilities (blueutil, brightness, dockutil, ...)",
-			Tools: []Tool{
-				{Name: "blueutil", Source: "brew", Installed: true, Version: "2.11.0",
-					InstallMac: "brew install blueutil"},
-				{Name: "brightness", Source: "brew", Installed: true, Version: "1.2",
-					InstallMac: "brew install brightness"},
-				{Name: "dockutil", Source: "brew", Installed: true, Version: "3.1.3",
-					InstallMac: "brew install dockutil"},
-				{Name: "switchaudio-osx", Source: "brew", Installed: true, Version: "1.2.4",
-					InstallMac: "brew install switchaudio-osx"},
-				{Name: "mas", Source: "brew", InstallMac: "brew install mas"},
-				{Name: "raycast", Source: "cask", Installed: true, Version: "cask",
-					InstallMac: "brew install --cask raycast"},
-				{Name: "maccy", Source: "cask", Installed: true, Version: "cask",
-					InstallMac: "brew install --cask maccy"},
-				{Name: "keycastr", Source: "cask",
-					InstallMac: "brew install --cask keycastr"},
-				{Name: "monitorcontrol", Source: "cask", Installed: true, Version: "cask",
-					InstallMac: "brew install --cask monitorcontrol"},
-			},
-		},
-		{
-			// AI CLIs — three picks (codex, claude code, opencode).
-			// All installed via npm globally for cross-platform consistency.
-			// Requires Node.js (≥18 for claude-code, ≥22 recommended for codex).
-			ID:          "ai-clis",
-			Name:        "ai-clis",
-			Description: "codex, claude-code, opencode (npm)",
+			ID:          "dev-tools",
+			Name:        "dev-tools",
+			Description: "AI coding CLIs (Claude Code, Codex, OpenCode, Droid)",
 			Tools: []Tool{
 				{
-					Name: "codex", Source: "npm",
-					Description: "OpenAI Codex CLI (@openai/codex)",
-					Installed:   true, Version: "0.14.0",
+					Name: "claude-code", Source: "custom", Binary: "claude",
+					Description:  "Anthropic Claude Code CLI",
+					InstallMac:   "curl -fsSL https://claude.ai/install.sh | bash",
+					InstallLinux: "curl -fsSL https://claude.ai/install.sh | bash",
+				},
+				{
+					Name: "codex", Source: "npm", Binary: "codex",
+					Description:  "OpenAI Codex CLI (@openai/codex)",
 					InstallMac:   "npm install -g @openai/codex",
 					InstallLinux: "npm install -g @openai/codex",
-					Binary:       "codex",
 				},
 				{
-					Name: "claude-code", Source: "npm",
-					Description: "Anthropic Claude Code CLI (@anthropic-ai/claude-code)",
-					Installed:   true, Version: "2.1.123",
-					InstallMac:   "npm install -g @anthropic-ai/claude-code",
-					InstallLinux: "npm install -g @anthropic-ai/claude-code",
-					Binary:       "claude",
+					Name: "opencode", Source: "custom", Binary: "opencode",
+					Description:  "sst/opencode — open-source coding agent",
+					InstallMac:   "curl -fsSL https://opencode.ai/install | bash",
+					InstallLinux: "curl -fsSL https://opencode.ai/install | bash",
 				},
 				{
-					Name: "opencode", Source: "npm",
-					Description: "Open-source TUI coding agent (opencode-ai)",
-					InstallMac:   "npm install -g opencode-ai",
-					InstallLinux: "npm install -g opencode-ai",
-					Binary:       "opencode",
+					Name: "droid", Source: "custom", Binary: "droid",
+					Description:  "Factory AI Droid CLI",
+					InstallMac:   "curl -fsSL https://app.factory.ai/cli | sh",
+					InstallLinux: "curl -fsSL https://app.factory.ai/cli | sh",
 				},
 			},
 		},
 		{
-			ID:          "media",
-			Name:        "media",
-			Description: "ffmpeg, yt-dlp, imagemagick, etc.",
+			ID:          "skills",
+			Name:        "skills",
+			Description: "Agent skills installed via `npx skills add` (cross-harness)",
 			Tools: []Tool{
-				{Name: "ffmpeg", Source: "brew", Installed: true, Version: "7.0",
-					InstallMac: "brew install ffmpeg", InstallLinux: "sudo apt-get install -y ffmpeg"},
-				{Name: "yt-dlp", Source: "brew", Installed: true, Version: "2024.9",
-					InstallMac: "brew install yt-dlp", InstallLinux: "sudo apt-get install -y yt-dlp"},
-				{Name: "imagemagick", Source: "brew", Installed: true, Version: "7.1.1",
-					InstallMac: "brew install imagemagick", InstallLinux: "sudo apt-get install -y imagemagick"},
-				{Name: "poppler", Source: "brew", Installed: true, Version: "24.08",
-					InstallMac: "brew install poppler", InstallLinux: "sudo apt-get install -y poppler-utils"},
-				{Name: "exiftool", Source: "brew",
-					InstallMac: "brew install exiftool", InstallLinux: "sudo apt-get install -y libimage-exiftool-perl"},
-			},
-		},
-		// Skill bundles — installed via `npx skills add` (Source: "skills")
-		// into the harnesses detected on the host (Claude Code, Codex,
-		// OpenCode). URLs below are placeholders the maintainer fills with
-		// real skill repos before merge. Defaults to false so they don't
-		// surprise existing users — opt-in via the tree picker.
-		{
-			ID:          "skills-frontend",
-			Name:        "skills-frontend",
-			Description: "Frontend skills (browser agent, design, etc.)",
-			Tools: []Tool{
-				{Name: "agent-browser", Source: "skills",
+				{
+					Name: "agent-browser", Source: "skills",
 					Description: "Headless-browser agent skill",
-					SkillURL:    "https://github.com/PLACEHOLDER/agent-browser"},
-				{Name: "frontend-design", Source: "skills",
+					SkillURL:    "https://github.com/anthropics/skills/tree/main/agent-browser",
+				},
+				{
+					Name: "frontend-design", Source: "skills",
 					Description: "UI/design review skill",
-					SkillURL:    "https://github.com/PLACEHOLDER/frontend-design"},
-			},
-		},
-		{
-			ID:          "skills-backend",
-			Name:        "skills-backend",
-			Description: "Backend skills (db, api, infra)",
-			Tools: []Tool{
-				{Name: "db-introspect", Source: "skills",
+					SkillURL:    "https://github.com/anthropics/skills/tree/main/frontend-design",
+				},
+				{
+					Name: "db-introspect", Source: "skills",
 					Description: "Database schema introspection skill",
-					SkillURL:    "https://github.com/PLACEHOLDER/db-introspect"},
-				{Name: "api-review", Source: "skills",
-					Description: "REST/GraphQL API review skill",
-					SkillURL:    "https://github.com/PLACEHOLDER/api-review"},
-			},
-		},
-		{
-			ID:          "skills-ai",
-			Name:        "skills-ai",
-			Description: "AI workflow skills (eval, prompt, RAG)",
-			Tools: []Tool{
-				{Name: "portless", Source: "skills",
-					Description: "vercel-labs/portless tunnel skill (example)",
-					SkillURL:    "https://github.com/vercel-labs/portless"},
-				{Name: "prompt-eval", Source: "skills",
+					SkillURL:    "https://github.com/anthropics/skills/tree/main/db-introspect",
+				},
+				{
+					Name: "prompt-eval", Source: "skills",
 					Description: "Prompt eval harness skill",
-					SkillURL:    "https://github.com/PLACEHOLDER/prompt-eval"},
+					SkillURL:    "https://github.com/anthropics/skills/tree/main/prompt-eval",
+				},
+				{
+					Name: "portless", Source: "skills",
+					Description: "vercel-labs/portless tunnel skill",
+					SkillURL:    "https://github.com/vercel-labs/portless",
+				},
 			},
 		},
 	}

@@ -16,7 +16,9 @@ package detect
 import (
 	"bytes"
 	"context"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -42,6 +44,9 @@ const probeTimeout = 3 * time.Second
 
 // Probe runs the detection sequence for a single tool. Synchronous.
 func Probe(t preset.Tool) Result {
+	if t.Source == "skills" {
+		return probeSkill(t)
+	}
 	bin := t.Binary
 	if bin == "" {
 		bin = t.Name
@@ -75,6 +80,40 @@ func Probe(t preset.Tool) Result {
 		}
 	}
 	return res
+}
+
+// skillSearchDirs lists the directories where an installed skill lives.
+// Order matters only for Path reporting — first hit wins.
+//
+//   - ~/.agents/skills/<name>/   cross-harness, the canonical location
+//     used by `npx skills add -g` for non-Claude harnesses.
+//   - ~/.claude/skills/<name>/   Claude-specific (real or symlinked).
+//
+// Both can be present (symlink fan-out); we treat either as installed.
+func skillSearchDirs() []string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil
+	}
+	return []string{
+		filepath.Join(home, ".agents", "skills"),
+		filepath.Join(home, ".claude", "skills"),
+	}
+}
+
+// probeSkill returns Installed=true when a directory matching the
+// skill's name exists under any known skills root. Symlinks resolve
+// (os.Stat, not Lstat) so symlinked installs count as present.
+func probeSkill(t preset.Tool) Result {
+	for _, root := range skillSearchDirs() {
+		dir := filepath.Join(root, t.Name)
+		fi, err := os.Stat(dir)
+		if err != nil || !fi.IsDir() {
+			continue
+		}
+		return Result{Installed: true, Path: dir}
+	}
+	return Result{}
 }
 
 // runVersionCmd executes <path> <args...> with a hard timeout, returning

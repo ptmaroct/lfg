@@ -7,7 +7,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/ptmaroct/lfg/internal/installer"
-	"github.com/ptmaroct/lfg/internal/preset"
 	"github.com/ptmaroct/lfg/internal/state"
 	"github.com/ptmaroct/lfg/internal/tui"
 )
@@ -29,7 +28,10 @@ func runTUI() error {
 	// the user sees animated progress instead of a frozen terminal while
 	// goroutines fan out. Probe finishes → transition to welcome with
 	// detect-applied bundles + the harness list set on the installer pkg.
-	bundles := preset.All()
+	bundles, err := loadPreset()
+	if err != nil {
+		return err
+	}
 
 	// In dry-run mode the TUI still walks every screen — the only
 	// difference is the install step uses the mock runner (canned lines,
@@ -45,9 +47,9 @@ func runTUI() error {
 		tui.NewWithProbe(theme, bundles, opts...),
 		tea.WithAltScreen(),
 	)
-	final, err := p.Run()
-	if err != nil {
-		return fmt.Errorf("tui run: %w", err)
+	final, runErr := p.Run()
+	if runErr != nil {
+		return fmt.Errorf("tui run: %w", runErr)
 	}
 
 	// On clean exit, save the theme that was active when the user quit

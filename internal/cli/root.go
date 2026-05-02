@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/ptmaroct/lfg/internal/preset"
 	"github.com/ptmaroct/lfg/internal/state"
 	"github.com/ptmaroct/lfg/internal/tui"
 )
@@ -25,6 +26,10 @@ var themeFlag string
 //   - lfg backup: prints source list + would-be filename, writes nothing
 //   - lfg update: prints target asset URL, doesn't swap binary (TODO)
 var dryRun bool
+
+// configFlag points at a TOML preset file (local path or http(s) URL).
+// Empty → use the built-in preset.All().
+var configFlag string
 
 // rootCmd is the top-level `lfg` command.
 var rootCmd = &cobra.Command{
@@ -55,6 +60,23 @@ func init() {
 		"color theme: lfg, dracula, catppuccin (default: persisted or 'lfg')")
 	rootCmd.PersistentFlags().BoolVarP(&dryRun, "dry-run", "n", false,
 		"preview only — no commands run, no files written")
+	rootCmd.PersistentFlags().StringVarP(&configFlag, "config", "c", "",
+		"preset file (local path or http(s) URL); defaults to the built-in preset")
+}
+
+// loadPreset returns the bundle slice for this run. Honors --config when
+// set, otherwise falls back to the built-in preset.All(). Errors here
+// are fatal — the user explicitly asked to load a config and we don't
+// want to silently fall back to defaults under their nose.
+func loadPreset() ([]preset.Bundle, error) {
+	if configFlag == "" {
+		return preset.All(), nil
+	}
+	bundles, err := preset.Load(configFlag)
+	if err != nil {
+		return nil, fmt.Errorf("load preset %q: %w", configFlag, err)
+	}
+	return bundles, nil
 }
 
 // resolveTheme picks the theme to use this run. Priority:

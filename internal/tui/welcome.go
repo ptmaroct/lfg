@@ -45,6 +45,11 @@ func newWelcome(p Palette) welcomeModel {
 				action: screenTree,
 			},
 			{
+				label:  "LOAD CONFIG FILE",
+				desc:   "Open a dialog to paste a preset path or URL.",
+				action: screenConfigInput,
+			},
+			{
 				label:  "BACKUP THIS MACHINE",
 				desc:   "Snapshot dotfiles, package list, configs into a single file.",
 				action: screenBackupPrompt,
@@ -79,15 +84,12 @@ func (m welcomeModel) Update(msg tea.Msg) (welcomeModel, tea.Cmd) {
 			return m, goTo(m.choices[m.cursor].action)
 		case "esc":
 			return m, goTo(screenQuitConfirm)
-		case "1":
-			m.cursor = 0
-			return m, goTo(m.choices[0].action)
-		case "2":
-			m.cursor = 1
-			return m, goTo(m.choices[1].action)
-		case "3":
-			m.cursor = 2
-			return m, goTo(m.choices[2].action)
+		case "1", "2", "3", "4":
+			idx := int(msg.String()[0] - '1')
+			if idx < len(m.choices) {
+				m.cursor = idx
+				return m, goTo(m.choices[idx].action)
+			}
 		}
 	}
 	return m, nil
@@ -131,7 +133,7 @@ func (m welcomeModel) View(width, height int) string {
 		b.String(),
 		HintLine(p,
 			KeyHint(p, "↑↓", "nav"),
-			KeyHint(p, "1-3", "jump"),
+			KeyHint(p, "1-4", "jump"),
 			KeyHint(p, "⏎", "select"),
 			KeyHint(p, "^T", "theme"),
 			KeyHint(p, "Q", "quit"),

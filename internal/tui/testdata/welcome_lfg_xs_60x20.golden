@@ -10,12 +10,14 @@ a new dev machine, in less time than this hint takes to read
                                                         
 ▸ 01  INSTALL RECOMMENDED SETUP                         
        Pick bundles, install tools. Opinionated but customizable.
-  02  BACKUP THIS MACHINE                               
+  02  LOAD CONFIG FILE                                  
+       Open a dialog to paste a preset path or URL.     
+  03  BACKUP THIS MACHINE                               
        Snapshot dotfiles, package list, configs into a single file.
-  03  QUIT                                              
+  04  QUIT                                              
        Exit lfg.                                        
                                                         
                                                         
 ────────────────────────────────────────────────────────
-  [↑↓] NAV  [1-3] JUMP  [⏎] SELECT  [^T] THEME  [Q] QUIT
+  [↑↓] NAV  [1-4] JUMP  [⏎] SELECT  [^T] THEME  [Q] QUIT
 ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛

@@ -120,7 +120,7 @@ Theme persists in `~/.config/lfg/state.json` so `--theme` is only needed once.
 | `space` `x` | toggle option |
 | `a` | toggle all (tree) |
 | `enter` | confirm / continue |
-| `1`–`3` | jump to action (welcome) |
+| `1`–`4` | jump to action (welcome) |
 | `esc` | back |
 | `q` | quit (confirm dialog) |
 | `Ctrl+T` | cycle theme |
@@ -199,6 +199,67 @@ go test ./internal/tui -run TestSnapshot_Welcome/welcome_lfg_md_100x30
 
 Snapshots use direct `View()` calls (not teatest byte streams) so the
 goldens are clean ANSI-stripped text — diffable in any review tool.
+
+### Testing on a fresh Linux box (Docker)
+
+End-to-end smoke testing on a clean machine — no leftover dotfiles, no
+brew already on the host, no installed AI CLIs to skew detect. The
+included `Dockerfile` builds Ubuntu 24.04 + linuxbrew + the lfg binary.
+
+**One-shot run** (rebuild image and launch the TUI inside):
+
+```sh
+make docker         # builds the image (slow first time, ~1.05 GB)
+make docker-run     # launches ./lfg inside an interactive container
+```
+
+**Iterate without rebuilding** — mount the source in and use the
+official Go image. Edits on your host show up immediately:
+
+```sh
+docker run --rm -it \
+  -v "$PWD":/app -w /app \
+  golang:1.26-bookworm \
+  bash -lc 'go run ./cmd/lfg'
+```
+
+**Verify a custom preset end-to-end**:
+
+```sh
+# in one terminal: serve the preset over HTTP
+python3 -m http.server 8000 --directory testdata
+
+# in another: run lfg inside the container with --config pointed at the host
+docker run --rm -it --network host \
+  -v "$PWD":/app -w /app \
+  golang:1.26-bookworm \
+  bash -lc 'go run ./cmd/lfg --config http://localhost:8000/sample-preset.toml'
+```
+
+**Reset state between runs** — the container is `--rm` so its
+filesystem is discarded, but if you mount the source you may want to
+also wipe the persistent `~/.config/lfg/`:
+
+```sh
+docker run --rm -it \
+  -v "$PWD":/app -w /app \
+  -v lfg-config:/root/.config/lfg \
+  golang:1.26-bookworm bash -lc 'go run ./cmd/lfg'
+
+docker volume rm lfg-config   # nuke between runs for a truly clean state
+```
+
+**What to verify in the clean container**:
+
+1. Welcome screen shows 4 menu items (Install / Load config / Backup / Quit).
+2. Tree picker: empty `[ ]` clearly visible; `brew` row in `barebones`
+   shows `[●]` (mandatory, can't toggle off).
+3. Confirm screen has labelled `CURRENT` + `VIA` columns.
+4. Skill detection: pre-create `~/.agents/skills/agent-browser/SKILL.md`
+   inside the container and re-run lfg — the skill should now show
+   installed in the tree picker.
+5. Failed install pauses on the screen with the log path printed; the
+   transcript lives at `~/.config/lfg/logs/install-*.log`.
 
 ## Roadmap
 

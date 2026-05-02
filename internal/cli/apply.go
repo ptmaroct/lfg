@@ -12,7 +12,6 @@ import (
 
 	"github.com/ptmaroct/lfg/internal/detect"
 	"github.com/ptmaroct/lfg/internal/installer"
-	"github.com/ptmaroct/lfg/internal/preset"
 )
 
 var (
@@ -49,7 +48,10 @@ func runApply(cmd *cobra.Command, args []string) error {
 		wanted[a] = true
 	}
 
-	bundles := preset.All()
+	bundles, err := loadPreset()
+	if err != nil {
+		return err
+	}
 	if !dryRun {
 		// Detect first so we can skip already-installed tools. Cheap on
 		// a warm cache.

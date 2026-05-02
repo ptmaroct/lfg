@@ -9,27 +9,27 @@
                                                                                                                                                                 
                                                                                                                                                                 
                                                                                                                                                                 
+                                                                                                                                                                
+                                                                                                                                                                
                               ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓                              
                                 ▌ lfg │ STEP 1/2 · PICK TOOLS                                                                                                   
                               ────────────────────────────────────────────────────────────────────────────────────────────────────                              
                                                                                                                                                                 
-                              ┃ PICK WHAT TO INSTALL                                                                7 SELECTED                                  
+                              ┃ PICK WHAT TO INSTALL                                                                8 SELECTED                                  
                                                                                                                                                                 
-                                          BUNDLE / TOOL                STATUS                                                                                   
+                                      BUNDLE / TOOL                  INSTALLED    VIA                                                                           
                                 ──────────────────────────────────────────────────────────────────────────────────────────────                                  
-                              ▸ [~] ▶ DEFAULT                      22 tools · 7 selected                                                                        
-                                [ ] ▶ MAC-POWER-USER               9 tools · 0 selected                                                                         
-                                [ ] ▶ AI-CLIS                      3 tools · 0 selected                                                                         
-                                [ ] ▶ MEDIA                        5 tools · 0 selected                                                                         
-                                [ ] ▶ SKILLS-FRONTEND              2 tools · 0 selected                                                                         
-                                [ ] ▶ SKILLS-BACKEND               2 tools · 0 selected                                                                         
-                                [ ] ▶ SKILLS-AI                    2 tools · 0 selected                                                                         
+                              ▸ [✓] ▶ BAREBONES                    8 tools · 8 selected                                                                         
+                                [ ] ▶ DEV-TOOLS                    4 tools · 0 selected                                                                         
+                                [ ] ▶ SKILLS                       5 tools · 0 selected                                                                         
                                 ──────────────────────────────────────────────────────────────────────────────────────────────                                  
                                                                                                                                                                 
                                                                                                                                                                 
                               ────────────────────────────────────────────────────────────────────────────────────────────────────                              
                                 [↑↓] NAV  [→←] TREE  [SP] TOGGLE  [A] ALL  [⏎] NEXT  [⎋] BACK                                                                   
                               ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛                              
+                                                                                                                                                                
+                                                                                                                                                                
                                                                                                                                                                 
                                                                                                                                                                 
                                                                                                                                                                 

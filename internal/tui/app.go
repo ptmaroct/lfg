@@ -22,7 +22,8 @@ const (
 	screenBackupDone
 	screenQuit
 	screenQuitConfirm
-	screenProbe // first-paint detection screen; entered only via NewWithProbe
+	screenProbe       // first-paint detection screen; entered only via NewWithProbe
+	screenConfigInput // welcome → "load config file" input dialog
 )
 
 // Model is the root bubbletea model. Each screen is a child model;
@@ -46,6 +47,7 @@ type Model struct {
 	backup       backupModel
 	quitConfirm  quitConfirmModel
 	probe        probeModel
+	configInput  configInputModel
 
 	selectedBundleIDs map[string]bool
 	selectedTools     map[string]bool // key = bundleID + "/" + toolName
@@ -201,6 +203,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.quitConfirm, cmd = m.quitConfirm.Update(msg)
 	case screenProbe:
 		m.probe, cmd = m.probe.Update(msg)
+	case screenConfigInput:
+		m.configInput, cmd = m.configInput.Update(msg)
 	}
 	return m, cmd
 }
@@ -228,6 +232,8 @@ func (m Model) forwardSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		m.quitConfirm, cmd = m.quitConfirm.Update(msg)
 	case screenProbe:
 		m.probe, cmd = m.probe.Update(msg)
+	case screenConfigInput:
+		m.configInput, cmd = m.configInput.Update(msg)
 	}
 	return m, cmd
 }
@@ -254,6 +260,8 @@ func (m Model) View() string {
 		return m.quitConfirm.View(m.width, m.height)
 	case screenProbe:
 		return m.probe.View(m.width, m.height)
+	case screenConfigInput:
+		return m.configInput.View(m.width, m.height)
 	case screenQuit:
 		return ""
 	}
@@ -328,6 +336,9 @@ func (m Model) transition(msg transitionMsg) (tea.Model, tea.Cmd) {
 	case screenProbe:
 		m.probe = newProbe(m.palette, m.bundles)
 		return m, m.probe.Init()
+	case screenConfigInput:
+		m.configInput = newConfigInput(m.palette)
+		return m, m.configInput.Init()
 	case screenQuit:
 		return m, tea.Quit
 	}
@@ -389,6 +400,9 @@ func (m Model) rehydrate() (tea.Model, tea.Cmd) {
 		// palette references are stale, and the next paint picks them
 		// up on its own. So just keep the existing model.
 		return m, nil
+	case screenConfigInput:
+		m.configInput = newConfigInput(m.palette)
+		return m, m.configInput.Init()
 	}
 	return m, nil
 }

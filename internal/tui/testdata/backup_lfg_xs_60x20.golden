@@ -1,20 +1,20 @@
-                                                                                
-                                                                                
-                                                                                
-                                                                                
+                                                                                  
+                                                                                  
+                                                                                  
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-  ▌ lfg │ BACKUP                                        
+  ▌ lfg │ LOAD CONFIG                                   
 ────────────────────────────────────────────────────────
                                                         
-Encrypt the backup?                                                             
-Encrypted = .tar.age (age). Plain = .tar.gz, no secrets.                        
-                                                                                
-                 .tar.age     .tar.gz                                          
+┃ LOAD PRESET              LOCAL FILE OR HTTP(S) URL    
+                                                        
+  Paste a TOML preset path. We'll fetch + parse it, then run detect.
+                                                        
+  › /path/to/preset.toml or https://example.com/preset.toml                       
+                                                        
                                                         
 ────────────────────────────────────────────────────────
-  [←→] SWITCH  [⏎] CONFIRM  [⎋] BACK                    
+  [⏎] LOAD  [⎋] BACK                                    
 ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
-                                                                                
-                                                                                
-                                                                                
-                                                                                
+                                                                                  
+                                                                                  
+                                                                                  
