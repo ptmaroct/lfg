@@ -33,11 +33,12 @@ type treePickerModel struct {
 }
 
 type treeRow struct {
-	kind     string // "bundle" or "tool"
+	kind     string // "bundle", "tool", or "subheader"
 	bundleID string
 	toolName string
 	depth    int
-	idx      int // index within parent bundle (1-based for tools)
+	idx      int    // index within parent bundle (1-based for tools)
+	label    string // for "subheader" rows: the label text
 }
 
 func newTreePicker(p Palette, bundles []preset.Bundle, initialBundleIDs map[string]bool, initialTools map[string]bool) treePickerModel {
@@ -49,6 +50,11 @@ func newTreePicker(p Palette, bundles []preset.Bundle, initialBundleIDs map[stri
 		pageSize: 16,
 	}
 	for k, v := range initialTools {
+		// Skip already-installed tools — they shouldn't queue for re-install.
+		bID, tName := splitKey(k)
+		if t := findToolInBundles(bundles, bID, tName); t.Installed {
+			continue
+		}
 		m.selected[k] = v
 	}
 	if len(initialTools) == 0 {
@@ -57,7 +63,20 @@ func newTreePicker(p Palette, bundles []preset.Bundle, initialBundleIDs map[stri
 				continue
 			}
 			for _, t := range b.Tools {
-				m.selected[b.ID+"/"+t.Name] = !t.Installed
+				if t.Installed {
+					continue
+				}
+				m.selected[b.ID+"/"+t.Name] = true
+			}
+		}
+	}
+	// Mandatory tools that AREN'T installed yet stay always-on so they
+	// can't be unchecked. Already-installed mandatory tools are simply
+	// counted as installed and need no selection state.
+	for _, b := range bundles {
+		for _, t := range b.Tools {
+			if t.Mandatory && !t.Installed {
+				m.selected[b.ID+"/"+t.Name] = true
 			}
 		}
 	}
@@ -66,12 +85,65 @@ func newTreePicker(p Palette, bundles []preset.Bundle, initialBundleIDs map[stri
 	return m
 }
 
+// splitKey decomposes "<bundleID>/<toolName>" → (bundleID, toolName).
+func splitKey(k string) (string, string) {
+	for i := 0; i < len(k); i++ {
+		if k[i] == '/' {
+			return k[:i], k[i+1:]
+		}
+	}
+	return k, ""
+}
+
+// findToolInBundles is a free-function variant of findTool used during
+// model construction (no receiver yet).
+func findToolInBundles(bundles []preset.Bundle, bundleID, toolName string) preset.Tool {
+	for _, b := range bundles {
+		if b.ID != bundleID {
+			continue
+		}
+		for _, t := range b.Tools {
+			if t.Name == toolName {
+				return t
+			}
+		}
+	}
+	return preset.Tool{}
+}
+
 func (m *treePickerModel) rebuildRows() {
 	m.rows = m.rows[:0]
 	for _, b := range m.bundles {
 		m.rows = append(m.rows, treeRow{kind: "bundle", bundleID: b.ID})
-		if m.expanded[b.ID] {
-			for i, t := range b.Tools {
+		if !m.expanded[b.ID] {
+			continue
+		}
+		// Split tools into to-install and already-installed groups so
+		// the user sees them as two distinct sections, not one mixed
+		// list where they have to mentally filter "already done" rows.
+		var toInstall, alreadyOK []preset.Tool
+		for _, t := range b.Tools {
+			if t.Installed {
+				alreadyOK = append(alreadyOK, t)
+			} else {
+				toInstall = append(toInstall, t)
+			}
+		}
+		for i, t := range toInstall {
+			m.rows = append(m.rows, treeRow{
+				kind: "tool", bundleID: b.ID, toolName: t.Name,
+				depth: 1, idx: i + 1,
+			})
+		}
+		if len(alreadyOK) > 0 {
+			label := "ALREADY INSTALLED"
+			if len(toInstall) == 0 {
+				label = "ALREADY INSTALLED — nothing else to do here"
+			}
+			m.rows = append(m.rows, treeRow{
+				kind: "subheader", bundleID: b.ID, label: label,
+			})
+			for i, t := range alreadyOK {
 				m.rows = append(m.rows, treeRow{
 					kind: "tool", bundleID: b.ID, toolName: t.Name,
 					depth: 1, idx: i + 1,
@@ -87,9 +159,15 @@ func (m *treePickerModel) rebuildRows() {
 	}
 }
 
+// bundleSelectionState only considers not-yet-installed tools.
+// Already-installed tools are out of band — they don't participate in
+// the selection state and shouldn't influence the bundle's checkbox.
 func (m treePickerModel) bundleSelectionState(b preset.Bundle) string {
 	on, off := 0, 0
 	for _, t := range b.Tools {
+		if t.Installed {
+			continue
+		}
 		if m.selected[b.ID+"/"+t.Name] {
 			on++
 		} else {
@@ -97,6 +175,9 @@ func (m treePickerModel) bundleSelectionState(b preset.Bundle) string {
 		}
 	}
 	switch {
+	case on+off == 0:
+		// All tools in this bundle already installed.
+		return "done"
 	case on == 0:
 		return "none"
 	case off == 0:
@@ -109,6 +190,9 @@ func (m treePickerModel) bundleSelectionState(b preset.Bundle) string {
 func (m treePickerModel) bundleSelectedCount(b preset.Bundle) int {
 	n := 0
 	for _, t := range b.Tools {
+		if t.Installed {
+			continue
+		}
 		if m.selected[b.ID+"/"+t.Name] {
 			n++
 		}
@@ -116,9 +200,33 @@ func (m treePickerModel) bundleSelectedCount(b preset.Bundle) int {
 	return n
 }
 
+// bundleInstalledCount counts tools detect already found.
+func (m treePickerModel) bundleInstalledCount(b preset.Bundle) int {
+	n := 0
+	for _, t := range b.Tools {
+		if t.Installed {
+			n++
+		}
+	}
+	return n
+}
+
+// bundlePendingTotal — tools that aren't installed yet (the pool the
+// checkbox + selection counter operates over).
+func (m treePickerModel) bundlePendingTotal(b preset.Bundle) int {
+	return len(b.Tools) - m.bundleInstalledCount(b)
+}
+
 func (m *treePickerModel) toggleAtCursor() {
 	row := m.rows[m.cursor]
+	if row.kind == "subheader" {
+		return
+	}
 	if row.kind == "tool" {
+		tool := m.findTool(row.bundleID, row.toolName)
+		if tool.Installed || tool.Mandatory {
+			return // installed = nothing to do; mandatory = forced on
+		}
 		key := row.bundleID + "/" + row.toolName
 		m.selected[key] = !m.selected[key]
 		return
@@ -126,6 +234,12 @@ func (m *treePickerModel) toggleAtCursor() {
 	bundle := m.findBundle(row.bundleID)
 	target := m.bundleSelectionState(bundle) != "all"
 	for _, t := range bundle.Tools {
+		if t.Installed {
+			continue // installed tools never selected
+		}
+		if t.Mandatory && !target {
+			continue // can't bulk-deselect mandatory rows
+		}
 		m.selected[bundle.ID+"/"+t.Name] = target
 	}
 }
@@ -200,6 +314,14 @@ func (m treePickerModel) Update(msg tea.Msg) (treePickerModel, tea.Cmd) {
 			m.collapseAtCursor()
 		case " ", "x":
 			m.toggleAtCursor()
+		case "i", "I":
+			// Tool info overlay. Only meaningful on tool rows; bundle
+			// rows just no-op so the key doesn't beep.
+			row := m.rows[m.cursor]
+			if row.kind == "tool" {
+				tool := m.findTool(row.bundleID, row.toolName)
+				return m, openInfoCmd(row.bundleID, tool)
+			}
 		case "a":
 			anyOn := false
 			for _, b := range m.bundles {
@@ -215,11 +337,10 @@ func (m treePickerModel) Update(msg tea.Msg) (treePickerModel, tea.Cmd) {
 				}
 			}
 		case "enter":
-			row := m.rows[m.cursor]
-			if row.kind == "bundle" && !m.expanded[row.bundleID] {
-				m.expandAtCursor()
-				return m, nil
-			}
+			// Enter always proceeds. Expand/collapse is reserved for
+			// arrow keys (→ ←) so Enter doesn't change meaning based
+			// on cursor row state — pressing it twice on a bundle
+			// shouldn't first expand and then advance.
 			if m.totalSelected() == 0 {
 				return m, nil
 			}
@@ -230,7 +351,7 @@ func (m treePickerModel) Update(msg tea.Msg) (treePickerModel, tea.Cmd) {
 				}
 			}
 			return m, goToWithTools(screenConfirm, tools)
-		case "esc":
+		case "esc", "backspace", "delete":
 			return m, goTo(screenWelcome)
 		}
 		if m.cursor < m.offset {
@@ -268,9 +389,6 @@ func (m treePickerModel) View(width, height int) string {
 
 	// Section label
 	b.WriteString(SectionLabel(p, "Pick what to install", fmt.Sprintf("%d selected", m.totalSelected()), contentW))
-	b.WriteByte('\n')
-	b.WriteString(lipgloss.NewStyle().Foreground(p.Muted).Italic(true).
-		Render("  Tabular bundles + tools. → expand · ← collapse · space toggle"))
 	b.WriteString("\n\n")
 
 	// Column header
@@ -295,6 +413,7 @@ func (m treePickerModel) View(width, height int) string {
 			KeyHint(p, "↑↓", "nav"),
 			KeyHint(p, "→←", "tree"),
 			KeyHint(p, "SP", "toggle"),
+			KeyHint(p, "I", "info"),
 			KeyHint(p, "A", "all"),
 			KeyHint(p, "⏎", "next"),
 			KeyHint(p, "⎋", "back"),
@@ -303,15 +422,57 @@ func (m treePickerModel) View(width, height int) string {
 	)
 }
 
+// Strict grid widths shared by the header, bundle row, and tool row.
+// Anything that prints inside one of these columns must use the same
+// width so the columns visually line up regardless of row type.
+const (
+	gridGutterW = 2  // "▸ " cursor or "  " padding
+	gridBoxW    = 3  // [✓] / [~] / [ ] / [●]
+	gridSpace   = 1  // separator between box and caret
+	gridCaretW  = 1  // ▶ ▼ (bundle) or "·" (tool)
+	gridSpace2  = 1  // separator between caret and name
+	gridNameW   = 22
+	gridGap     = 2 // gap between name and INSTALLED column
+	gridStatusW = 12
+)
+
+// gridLeading is the column offset before the NAME column starts.
+// Used by the header to align with bundle/tool row content.
+const gridLeading = gridGutterW + gridBoxW + gridSpace + gridCaretW + gridSpace2
+
 func (m treePickerModel) renderColumnHeader(contentW int) string {
 	p := m.palette
-	colStyle := lipgloss.NewStyle().Foreground(p.Muted).Bold(false)
-	return fmt.Sprintf("  %s  %s  %s  %s",
-		colStyle.Render("ID  "),
-		colStyle.Render(padRightPlain("BUNDLE / TOOL", 24)),
-		colStyle.Render(padRightPlain("STATE", 12)),
-		colStyle.Render("COUNT"),
-	)
+	style := lipgloss.NewStyle().Foreground(p.Muted)
+	return strings.Repeat(" ", gridLeading) +
+		style.Render(padRightPlain("BUNDLE / TOOL", gridNameW)) +
+		strings.Repeat(" ", gridGap) +
+		style.Render(padRightPlain("INSTALLED", gridStatusW)) +
+		" " +
+		style.Render("VIA")
+}
+
+// checkbox returns a clear, dumb-obvious selection glyph.
+//
+//	[ ] = none (Muted, not Subtle — Subtle blends into the background)
+//	[~] = partial (Warn, bold)
+//	[✓] = all / selected (Primary, bold)
+//	[●] = mandatory (always-on, can't be toggled — high-contrast green)
+//	[✓] = done — already installed (Muted, NOT bold; reads as background)
+func checkbox(p Palette, state string) string {
+	switch state {
+	case "all":
+		return lipgloss.NewStyle().Bold(true).Foreground(p.Primary).Render("[✓]")
+	case "partial":
+		return lipgloss.NewStyle().Bold(true).Foreground(p.Warn).Render("[~]")
+	case "mandatory":
+		return lipgloss.NewStyle().Bold(true).Foreground(p.Success).Render("[●]")
+	case "done":
+		// Subdued so installed-tool rows recede; the eye finds the
+		// pickable rows first instead of the dense green grid.
+		return lipgloss.NewStyle().Foreground(p.Muted).Render("[✓]")
+	default:
+		return lipgloss.NewStyle().Bold(true).Foreground(p.Muted).Render("[ ]")
+	}
 }
 
 func padRightPlain(s string, n int) string {
@@ -331,95 +492,137 @@ func (m treePickerModel) renderRow(i int) string {
 		gutter = lipgloss.NewStyle().Foreground(p.Primary).Bold(true).Render("▸ ")
 	}
 
-	if row.kind == "bundle" {
-		return gutter + m.renderBundleRow(i, row)
+	switch row.kind {
+	case "bundle":
+		return gutter + m.renderBundleRow(row)
+	case "subheader":
+		return gutter + m.renderSubheaderRow(row)
+	default:
+		return gutter + m.renderToolRow(row)
 	}
-	return gutter + m.renderToolRow(i, row)
 }
 
-func (m treePickerModel) renderBundleRow(_ int, row treeRow) string {
+// renderSubheaderRow — dim italic divider introducing the "ALREADY
+// INSTALLED" group inside an expanded bundle. Aligned with the grid's
+// NAME column so it sits cleanly above the rows it labels.
+func (m treePickerModel) renderSubheaderRow(row treeRow) string {
+	p := m.palette
+	style := lipgloss.NewStyle().Foreground(p.Muted).Italic(true)
+	// gridLeading - gridGutterW because gutter is added by renderRow.
+	return strings.Repeat(" ", gridLeading-gridGutterW) + style.Render(row.label)
+}
+
+// renderBundleRow uses the strict shared grid:
+//
+//	[box] [caret] NAME(22)  STATUS(rest of line)
+//
+// Status fills the INSTALLED + VIA columns (it's a single string for
+// bundle rows since they don't have per-tool version/source).
+func (m treePickerModel) renderBundleRow(row treeRow) string {
 	p := m.palette
 	bundle := m.findBundle(row.bundleID)
+	state := m.bundleSelectionState(bundle)
 
-	// ID column
-	idStr := bundleID2Num(m.bundles, bundle.ID)
-	idCol := lipgloss.NewStyle().Foreground(p.Muted).Render(fmt.Sprintf("%02d", idStr))
+	box := checkbox(p, state)
 	caret := "▶"
 	if m.expanded[bundle.ID] {
 		caret = "▼"
 	}
 	caretStyled := lipgloss.NewStyle().Foreground(p.Primary).Render(caret)
 
-	// Name (uppercase)
 	name := strings.ToUpper(bundle.Name)
 	nameStyle := lipgloss.NewStyle().Foreground(p.Text).Bold(true)
-	if state := m.bundleSelectionState(bundle); state == "all" || state == "partial" {
+	switch state {
+	case "all", "partial":
 		nameStyle = nameStyle.Foreground(p.Primary)
+	case "done":
+		nameStyle = nameStyle.Foreground(p.Muted) // recede
 	}
 	nameRendered := nameStyle.Render(name)
-	nameCol := padName(nameRendered, name, 24)
+	nameCol := padName(nameRendered, name, gridNameW)
 
-	// State dot
-	var dot string
-	switch m.bundleSelectionState(bundle) {
-	case "all":
-		dot = lipgloss.NewStyle().Foreground(p.Primary).Render("●")
-	case "partial":
-		dot = lipgloss.NewStyle().Foreground(p.Warn).Render("◐")
+	pending := m.bundlePendingTotal(bundle)
+	installed := m.bundleInstalledCount(bundle)
+	sel := m.bundleSelectedCount(bundle)
+	total := len(bundle.Tools)
+
+	var statusText string
+	switch {
+	case pending == 0:
+		statusText = fmt.Sprintf("all %d done", total)
+	case installed == 0:
+		statusText = fmt.Sprintf("%d/%d picked", sel, pending)
 	default:
-		dot = lipgloss.NewStyle().Foreground(p.Subtle).Render("○")
+		statusText = fmt.Sprintf("%d/%d picked  ·  %d done", sel, pending, installed)
 	}
-	stateText := fmt.Sprintf("%d/%d", m.bundleSelectedCount(bundle), len(bundle.Tools))
-	stateRendered := dot + " " + lipgloss.NewStyle().Foreground(p.Muted).Render(stateText)
-	stateCol := padPlain(stateRendered, 12)
+	status := lipgloss.NewStyle().Foreground(p.Muted).Render(statusText)
 
-	// Count
-	countCol := lipgloss.NewStyle().Foreground(p.Muted).Render(fmt.Sprintf("%d tools", len(bundle.Tools)))
-
-	return fmt.Sprintf("%s %s  %s  %s  %s", idCol, caretStyled, nameCol, stateCol, countCol)
+	// box + space + caret + space + name + gap + status (free-form, fills rest)
+	return box + " " + caretStyled + " " + nameCol + strings.Repeat(" ", gridGap) + status
 }
 
-func (m treePickerModel) renderToolRow(_ int, row treeRow) string {
+// renderToolRow uses the same strict grid as bundle rows so columns
+// line up. Tools occupy the bundle's caret column with a thin "·"
+// connector instead — visual nesting without a separate indent that
+// would offset every column rightward.
+//
+// Columns: [box] · NAME(22)  CURRENT(12) VIA
+//   - CURRENT = version installed now (— when missing)
+//   - VIA     = installer backend (brew/mise/npm/curl/skills)
+func (m treePickerModel) renderToolRow(row treeRow) string {
 	p := m.palette
 	tool := m.findTool(row.bundleID, row.toolName)
 	selected := m.selected[row.bundleID+"/"+row.toolName]
 
-	// ID column: blank for tools (parent has it)
-	idCol := lipgloss.NewStyle().Foreground(p.Muted).Render("    ")
-
-	// Indent connector
-	connector := lipgloss.NewStyle().Foreground(p.Hairline).Render("└─")
-
-	// State dot (filled if selected)
-	var dot string
-	if selected {
-		dot = lipgloss.NewStyle().Foreground(p.Primary).Render("●")
-	} else {
-		dot = lipgloss.NewStyle().Foreground(p.Subtle).Render("○")
+	var box string
+	switch {
+	case tool.Installed:
+		box = checkbox(p, "done")
+	case tool.Mandatory:
+		box = checkbox(p, "mandatory")
+	case selected:
+		box = checkbox(p, "all")
+	default:
+		box = checkbox(p, "none")
 	}
 
-	// Name
+	// "·" sits where bundle rows put the caret — keeps the column grid
+	// stable and gives a subtle nesting cue without a 4-space indent.
+	connector := lipgloss.NewStyle().Foreground(p.Subtle).Render("·")
+
 	nameStyle := lipgloss.NewStyle().Foreground(p.Text)
-	if selected {
+	switch {
+	case tool.Installed:
+		nameStyle = nameStyle.Foreground(p.Muted)
+	case selected:
 		nameStyle = nameStyle.Foreground(p.Primary).Bold(true)
 	}
 	nameRendered := nameStyle.Render(tool.Name)
-	nameCol := padName(nameRendered, tool.Name, 22)
+	nameCol := padName(nameRendered, tool.Name, gridNameW)
 
-	// State pill
-	var state string
+	var current string
 	if tool.Installed {
-		state = lipgloss.NewStyle().Foreground(p.Success).Render("v" + tool.Version)
+		v := tool.Version
+		if v == "" {
+			v = "installed"
+		} else {
+			v = "v" + v
+		}
+		current = lipgloss.NewStyle().Foreground(p.Muted).Render(v)
 	} else {
-		state = lipgloss.NewStyle().Foreground(p.Muted).Italic(true).Render("missing")
+		current = lipgloss.NewStyle().Foreground(p.Subtle).Render("—")
 	}
-	stateCol := padPlain(state, 12)
+	currentCol := padPlain(current, gridStatusW)
 
-	// Source
-	src := lipgloss.NewStyle().Foreground(p.Muted).Render(tool.Source)
+	srcColor := p.Muted
+	if tool.Installed {
+		srcColor = p.Subtle
+	}
+	src := lipgloss.NewStyle().Foreground(srcColor).Render(tool.Source)
 
-	return fmt.Sprintf("%s %s %s %s  %s  %s",
-		idCol, connector, dot, nameCol, stateCol, src)
+	// box + space + connector + space + name + gap + current + space + src
+	return box + " " + connector + " " + nameCol +
+		strings.Repeat(" ", gridGap) + currentCol + " " + src
 }
 
 // bundleID2Num returns the 1-based ordinal of a bundle within the slice.

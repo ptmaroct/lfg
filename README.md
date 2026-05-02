@@ -90,23 +90,28 @@ go build -o lfg ./cmd/lfg
 ## Usage
 
 ```sh
-lfg                        # launch TUI (default theme)
-lfg --theme=dracula        # explicit theme override
-lfg apply                  # headless install of the 'default' bundle
-lfg apply default ai-clis  # multiple bundles, non-interactively
-lfg backup                 # snapshot dotfiles + configs (tar.age)
-lfg backup --encrypt=false # plain tar.gz instead
-lfg doctor                 # diagnose environment readiness
-lfg version --verbose      # print build metadata
-lfg update                 # self-update from GitHub releases
+lfg                              # launch TUI (default theme)
+lfg --theme=dracula              # explicit theme override
+lfg apply barebones              # headless install of one bundle
+lfg apply barebones dev-tools    # multiple bundles, non-interactively
+lfg backup                       # snapshot dotfiles + configs (locked by default)
+lfg backup --encrypt=false       # plain tarball, no key needed to open
+lfg export                       # save current preset → ~/lfg-preset-<date>.toml
+lfg export -o ./my-preset.toml   # explicit output path
+lfg --config ./my-preset.toml    # load custom bundles instead of the built-in ones
+lfg --config https://example.com/preset.toml   # remote preset over http(s)
+lfg doctor                       # diagnose environment readiness
+lfg version --verbose            # print build metadata
+lfg update                       # self-update from GitHub releases
 ```
 
 `--dry-run` (or `-n`) is a persistent flag — works on every command:
 
 ```sh
 lfg -n                     # walk the TUI flow with the install step mocked
-lfg apply -n default       # print planned commands, exec nothing
+lfg apply -n barebones     # print planned commands, exec nothing
 lfg backup -n              # list source counts + would-be filename, write nothing
+lfg export -n              # print the path it would write, no file created
 ```
 
 Theme persists in `~/.config/lfg/state.json` so `--theme` is only needed once.
@@ -119,12 +124,78 @@ Theme persists in `~/.config/lfg/state.json` so `--theme` is only needed once.
 | `→ ←` | expand / collapse (tree) |
 | `space` `x` | toggle option |
 | `a` | toggle all (tree) |
+| `i` | tool info (description, homepage, install command) |
 | `enter` | confirm / continue |
-| `1`–`3` | jump to action (welcome) |
+| `1`–`5` | jump to action (welcome) |
 | `esc` | back |
 | `q` | quit (confirm dialog) |
 | `Ctrl+T` | cycle theme |
 | `Ctrl+C` | force quit |
+
+### Custom presets
+
+Pass any TOML file as `--config`. The schema mirrors the built-in preset
+(see `testdata/sample-preset.toml`):
+
+```toml
+[[bundles]]
+id = "minimal"
+name = "minimal"
+default = true
+
+  [[bundles.tools]]
+  name = "git"
+  source = "brew"
+  homepage = "https://git-scm.com"
+  install_mac = "brew install git"
+  install_linux = "sudo apt-get install -y git"
+```
+
+Mark a tool `mandatory = true` to make it always-on (rendered with `[●]`,
+can't be unchecked). Use `source = "skills"` + `skill_url = "..."` for
+agent skills installed via `npx skills add`.
+
+Round-trip your current setup:
+
+```sh
+lfg export                  # save → ~/lfg-preset-YYYY-MM-DD.toml
+# move the file to a new machine
+lfg --config ./preset.toml  # bundles, mandatories, install commands all preserved
+```
+
+### Backup — what's in it, where it goes
+
+`lfg backup` collects a curated list of files from your home directory
+into a single archive. Source groups (each one is silently skipped if
+nothing matches):
+
+- **Shell config** — `.zshrc`, `.zprofile`, `.zshenv`, `.bashrc`, `.bash_profile`, `.profile`
+- **Editors / dotfiles** — `.gitconfig`, `.tmux.conf`, `.vimrc`, `.editorconfig`, `.inputrc`
+- **Starship + dev tool configs** — `~/.config/{starship,mise,bat,btop,lazygit,yazi,glow}`
+- **Editor configs** — `~/.config/{nvim,zed,ghostty,zellij}`
+- **AI tool settings** — `~/.claude/{settings.json,CLAUDE.md,agents,commands}`, `~/.codex/config.toml`
+- **SSH** — `~/.ssh/` (config + public keys; **private keys are NEVER copied** unless you pass `--include-ssh-keys` *and* enable encryption)
+
+The TUI shows you this exact list with `●`/`○` presence dots before
+asking you to confirm — no surprise inclusions.
+
+**Why tar (not zip):** preserves UNIX file modes and symlinks, which
+matters for SSH config + dotfile hierarchies. zip mangles both. The
+output is `tar.gz` (plain) or `tar.age` (locked with a key from
+[age](https://github.com/FiloSottile/age)).
+
+**The "lock it" option:**
+
+- *Locked* — file is encrypted with a key at `~/.config/lfg/key.txt`.
+  Only that key can open it. Pick this if the backup will leave your
+  machine (cloud sync, USB, email). **Back up the key file separately**
+  — without it, even you can't recover the archive.
+- *Skip lock* — plain `.tar.gz`. Anyone with the file can read it.
+  Pick this when the archive stays on this machine and you want to
+  peek inside (`tar -tzf <file>`).
+
+**Restore later:** the result screen shows the exact `lfg backup --restore <path>`
+command for whichever option you picked.
 
 ## Architecture
 
@@ -199,6 +270,67 @@ go test ./internal/tui -run TestSnapshot_Welcome/welcome_lfg_md_100x30
 
 Snapshots use direct `View()` calls (not teatest byte streams) so the
 goldens are clean ANSI-stripped text — diffable in any review tool.
+
+### Testing on a fresh Linux box (Docker)
+
+End-to-end smoke testing on a clean machine — no leftover dotfiles, no
+brew already on the host, no installed AI CLIs to skew detect. The
+included `Dockerfile` builds Ubuntu 24.04 + linuxbrew + the lfg binary.
+
+**One-shot run** (rebuild image and launch the TUI inside):
+
+```sh
+make docker         # builds the image (slow first time, ~1.05 GB)
+make docker-run     # launches ./lfg inside an interactive container
+```
+
+**Iterate without rebuilding** — mount the source in and use the
+official Go image. Edits on your host show up immediately:
+
+```sh
+docker run --rm -it \
+  -v "$PWD":/app -w /app \
+  golang:1.26-bookworm \
+  bash -lc 'go run ./cmd/lfg'
+```
+
+**Verify a custom preset end-to-end**:
+
+```sh
+# in one terminal: serve the preset over HTTP
+python3 -m http.server 8000 --directory testdata
+
+# in another: run lfg inside the container with --config pointed at the host
+docker run --rm -it --network host \
+  -v "$PWD":/app -w /app \
+  golang:1.26-bookworm \
+  bash -lc 'go run ./cmd/lfg --config http://localhost:8000/sample-preset.toml'
+```
+
+**Reset state between runs** — the container is `--rm` so its
+filesystem is discarded, but if you mount the source you may want to
+also wipe the persistent `~/.config/lfg/`:
+
+```sh
+docker run --rm -it \
+  -v "$PWD":/app -w /app \
+  -v lfg-config:/root/.config/lfg \
+  golang:1.26-bookworm bash -lc 'go run ./cmd/lfg'
+
+docker volume rm lfg-config   # nuke between runs for a truly clean state
+```
+
+**What to verify in the clean container**:
+
+1. Welcome screen shows 4 menu items (Install / Load config / Backup / Quit).
+2. Tree picker: empty `[ ]` clearly visible; `brew` row in `barebones`
+   shows `[●]` (mandatory, can't toggle off).
+3. Confirm screen has labelled `CURRENT` + `VIA` columns.
+4. Skill detection: pre-create `~/.agents/skills/agent-browser/SKILL.md`
+   inside the container and re-run lfg — the skill should now show
+   installed in the tree picker.
+5. Failed install pauses on the screen with the log path printed; the
+   transcript lives at `~/.config/lfg/logs/install-*.log`.
 
 ## Roadmap
 

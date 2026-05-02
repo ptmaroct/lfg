@@ -247,12 +247,25 @@ func writeSource(tw *tar.Writer, s Source, allowSSHKeys bool) (int, int64, int, 
 }
 
 // writeFile copies a single file into the tar. Returns bytes written.
+// Skips irregular files (sockets, fifos, devices) — tar can't represent
+// them, and a stray ssh-agent socket under ~/.ssh shouldn't fail the
+// whole backup.
 func writeFile(tw *tar.Writer, path, archiveName string) (int64, error) {
 	info, err := os.Lstat(path)
 	if err != nil {
 		return 0, err
 	}
-	hdr, err := tar.FileInfoHeader(info, "")
+	mode := info.Mode()
+	// Allow regular files and symlinks; everything else (Sockets, Pipes,
+	// Devices, etc.) gets silently skipped.
+	if !mode.IsRegular() && mode&os.ModeSymlink == 0 {
+		return 0, nil
+	}
+	link := ""
+	if mode&os.ModeSymlink != 0 {
+		link, _ = os.Readlink(path)
+	}
+	hdr, err := tar.FileInfoHeader(info, link)
 	if err != nil {
 		return 0, err
 	}
@@ -260,7 +273,7 @@ func writeFile(tw *tar.Writer, path, archiveName string) (int64, error) {
 	if err := tw.WriteHeader(hdr); err != nil {
 		return 0, err
 	}
-	if !info.Mode().IsRegular() {
+	if !mode.IsRegular() {
 		return 0, nil
 	}
 	f, err := os.Open(path)

@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"strings"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
@@ -17,14 +19,21 @@ import (
 type quitConfirmModel struct {
 	palette Palette
 	form    *huh.Form
-	answer  bool
+	// answer is a heap pointer so the form's bound accessor and the
+	// model's reads stay coherent across the value-receiver copies that
+	// bubbletea makes on every Update. Using a plain bool here would
+	// leave the form mutating the original heap-escaped struct while
+	// reads happen on a stale copy — Enter on "Yes, quit" then dismisses
+	// instead of quitting.
+	answer *bool
 }
 
 // quitCancelMsg signals the root model to restore the previous screen.
 type quitCancelMsg struct{}
 
 func newQuitConfirm(p Palette) quitConfirmModel {
-	m := quitConfirmModel{palette: p}
+	answer := false
+	m := quitConfirmModel{palette: p, answer: &answer}
 	m.form = huh.NewForm(
 		huh.NewGroup(
 			huh.NewConfirm().
@@ -32,7 +41,7 @@ func newQuitConfirm(p Palette) quitConfirmModel {
 				Description("Leave the installer. Nothing has been written to your system yet.").
 				Affirmative("Yes, quit").
 				Negative("No, stay").
-				Value(&m.answer),
+				Value(m.answer),
 		),
 	).
 		WithTheme(HuhTheme(p)).
@@ -49,7 +58,7 @@ func (m quitConfirmModel) Update(msg tea.Msg) (quitConfirmModel, tea.Cmd) {
 		switch k.String() {
 		case "y", "Y":
 			return m, tea.Quit
-		case "esc":
+		case "n", "N", "esc", "backspace", "delete":
 			return m, func() tea.Msg { return quitCancelMsg{} }
 		}
 	}
@@ -59,7 +68,7 @@ func (m quitConfirmModel) Update(msg tea.Msg) (quitConfirmModel, tea.Cmd) {
 		m.form = ff
 	}
 	if m.form.State == huh.StateCompleted {
-		if m.answer {
+		if m.answer != nil && *m.answer {
 			return m, tea.Quit
 		}
 		return m, func() tea.Msg { return quitCancelMsg{} }
@@ -80,19 +89,29 @@ func (m quitConfirmModel) View(width, height int) string {
 	if canvasW < 56 {
 		canvasW = 56
 	}
-	contentW := canvasW - 4
 
-	inner := lipgloss.PlaceHorizontal(contentW, lipgloss.Center, m.form.View())
+	// Center every line of the form view independently within canvasW so
+	// the title, description, and button row all sit on the canvas axis.
+	// PlaceHorizontal on the whole block centers by max line width, which
+	// drifts the buttons off-center because the description line is
+	// wider than the button row.
+	formView := m.form.View()
+	lines := strings.Split(formView, "\n")
+	for i, ln := range lines {
+		// Strip both-side padding huh adds via its Width().Align()
+		// styling; without trimming, PlaceHorizontal centers the
+		// bounding box (padded) instead of the visible content, so the
+		// buttons drift off the canvas axis.
+		trimmed := strings.TrimSpace(ln)
+		lines[i] = lipgloss.PlaceHorizontal(canvasW, lipgloss.Center, trimmed)
+	}
+	inner := strings.Join(lines, "\n")
 
 	return Frame(m.palette, width, height,
 		"confirm quit",
 		inner,
-		HintLine(m.palette,
-			KeyHint(m.palette, "←→", "switch"),
-			KeyHint(m.palette, "Y", "quit"),
-			KeyHint(m.palette, "⎋", "cancel"),
-			KeyHint(m.palette, "⏎", "select"),
-		),
+		// No hint line — dialog buttons + Esc are self-explanatory.
+		HintLine(m.palette, KeyHint(m.palette, "⎋", "dismiss")),
 		height < 22,
 	)
 }

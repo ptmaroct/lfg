@@ -1,0 +1,33 @@
+# Sample preset — minimal config for testing `lfg --config`.
+# Schema mirrors internal/preset/preset.go (Bundle/Tool with toml tags).
+# Pass via:  lfg --config ./testdata/sample-preset.toml
+
+[[bundles]]
+id = "minimal"
+name = "minimal"
+description = "Just git + ripgrep — proof-of-concept preset"
+default = true
+
+  [[bundles.tools]]
+  name = "git"
+  source = "brew"
+  install_mac = "brew install git"
+  install_linux = "sudo apt-get install -y git"
+
+  [[bundles.tools]]
+  name = "ripgrep"
+  source = "brew"
+  binary = "rg"
+  install_mac = "brew install ripgrep"
+  install_linux = "sudo apt-get install -y ripgrep"
+
+[[bundles]]
+id = "skills"
+name = "skills"
+description = "One sample skill"
+
+  [[bundles.tools]]
+  name = "agent-browser"
+  source = "skills"
+  description = "Headless-browser agent skill"
+  skill_url = "https://github.com/anthropics/skills/tree/main/agent-browser"

@@ -16,7 +16,9 @@ package detect
 import (
 	"bytes"
 	"context"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -42,6 +44,9 @@ const probeTimeout = 3 * time.Second
 
 // Probe runs the detection sequence for a single tool. Synchronous.
 func Probe(t preset.Tool) Result {
+	if t.Source == "skills" {
+		return probeSkill(t)
+	}
 	bin := t.Binary
 	if bin == "" {
 		bin = t.Name
@@ -75,6 +80,40 @@ func Probe(t preset.Tool) Result {
 		}
 	}
 	return res
+}
+
+// skillSearchDirs lists the directories where an installed skill lives.
+// Order matters only for Path reporting — first hit wins.
+//
+//   - ~/.agents/skills/<name>/   cross-harness, the canonical location
+//     used by `npx skills add -g` for non-Claude harnesses.
+//   - ~/.claude/skills/<name>/   Claude-specific (real or symlinked).
+//
+// Both can be present (symlink fan-out); we treat either as installed.
+func skillSearchDirs() []string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil
+	}
+	return []string{
+		filepath.Join(home, ".agents", "skills"),
+		filepath.Join(home, ".claude", "skills"),
+	}
+}
+
+// probeSkill returns Installed=true when a directory matching the
+// skill's name exists under any known skills root. Symlinks resolve
+// (os.Stat, not Lstat) so symlinked installs count as present.
+func probeSkill(t preset.Tool) Result {
+	for _, root := range skillSearchDirs() {
+		dir := filepath.Join(root, t.Name)
+		fi, err := os.Stat(dir)
+		if err != nil || !fi.IsDir() {
+			continue
+		}
+		return Result{Installed: true, Path: dir}
+	}
+	return Result{}
 }
 
 // runVersionCmd executes <path> <args...> with a hard timeout, returning
@@ -126,6 +165,70 @@ func ProbeAll(bundles []preset.Bundle) map[string]Result {
 	}
 	wg.Wait()
 	return results
+}
+
+// ProbeStep is one streamed probe outcome. Emitted by ProbeAllStream
+// once per tool so the TUI can show live progress instead of the
+// single-shot ProbeAll waiting silently.
+type ProbeStep struct {
+	Key    string
+	Tool   preset.Tool
+	Result Result
+}
+
+// ProbeAllStream fans out probes like ProbeAll but emits each completion
+// on `out`, closing the channel when all probes finish. Buffer `out`
+// generously (≥ total tool count) or the goroutines will block. Use
+// Apply on the bundles + the collected results map for the final shape.
+func ProbeAllStream(bundles []preset.Bundle, out chan<- ProbeStep) {
+	type job struct {
+		key string
+		t   preset.Tool
+	}
+	var jobs []job
+	for _, b := range bundles {
+		for _, t := range b.Tools {
+			jobs = append(jobs, job{key: b.ID + "/" + t.Name, t: t})
+		}
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(len(jobs))
+	for _, j := range jobs {
+		go func(j job) {
+			defer wg.Done()
+			out <- ProbeStep{Key: j.key, Tool: j.t, Result: Probe(j.t)}
+		}(j)
+	}
+	wg.Wait()
+	close(out)
+}
+
+// harnessProbes lists the AI harnesses we can pass to `npx skills add -a`.
+// Each entry maps the npx-skills agent name to the binary we LookPath for.
+// Order is the priority order presented to the skills CLI when multiple
+// harnesses are present — claude-code first since it's the lfg default.
+var harnessProbes = []struct {
+	Agent  string // -a flag value for `npx skills add`
+	Binary string // binary to LookPath
+}{
+	{Agent: "claude-code", Binary: "claude"},
+	{Agent: "codex", Binary: "codex"},
+	{Agent: "opencode", Binary: "opencode"},
+}
+
+// DetectedHarnesses returns the npx-skills agent names corresponding to
+// AI harness binaries currently on PATH. Empty result is possible when
+// none of the supported harnesses are installed; callers should fall
+// back to a default (the skills installer uses claude-code).
+func DetectedHarnesses() []string {
+	var found []string
+	for _, h := range harnessProbes {
+		if _, err := exec.LookPath(h.Binary); err == nil {
+			found = append(found, h.Agent)
+		}
+	}
+	return found
 }
 
 // Apply overlays detect results onto bundle data, returning a new slice

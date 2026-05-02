@@ -22,6 +22,10 @@ const (
 	screenBackupDone
 	screenQuit
 	screenQuitConfirm
+	screenProbe       // first-paint detection screen; entered only via NewWithProbe
+	screenConfigInput // welcome → "load config file" input dialog
+	screenInfo        // tree picker → "i" key → tool metadata overlay
+	screenExport      // welcome → "export this machine" save-to-TOML dialog
 )
 
 // Model is the root bubbletea model. Each screen is a child model;
@@ -44,6 +48,11 @@ type Model struct {
 	done         doneModel
 	backup       backupModel
 	quitConfirm  quitConfirmModel
+	probe        probeModel
+	configInput  configInputModel
+	info         infoModel
+	infoPrev     screen // screen to return to after info dialog closes
+	export       exportModel
 
 	selectedBundleIDs map[string]bool
 	selectedTools     map[string]bool // key = bundleID + "/" + toolName
@@ -99,7 +108,39 @@ func NewWithBundles(theme ThemeName, bundles []preset.Bundle, opts ...Option) Mo
 	return m
 }
 
+// NewWithProbe is the CLI-startup constructor. It takes raw (un-probed)
+// bundles and starts on screenProbe so the user sees detection progress
+// instead of a frozen terminal. The probe screen runs detect.ProbeAll
+// in the background, then transitions to welcome with the result-applied
+// bundles. Snapshot tests intentionally use New / NewWithBundles so they
+// skip the probe step (deterministic state).
+func NewWithProbe(theme ThemeName, raw []preset.Bundle, opts ...Option) Model {
+	p := PaletteFor(theme)
+	pre := map[string]bool{}
+	for _, bundle := range raw {
+		if bundle.Default {
+			pre[bundle.ID] = true
+		}
+	}
+	m := Model{
+		screen:            screenProbe,
+		palette:           p,
+		theme:             theme,
+		bundles:           raw,
+		selectedBundleIDs: pre,
+		selectedTools:     map[string]bool{},
+	}
+	m.probe = newProbe(p, raw)
+	for _, o := range opts {
+		o(&m)
+	}
+	return m
+}
+
 func (m Model) Init() tea.Cmd {
+	if m.screen == screenProbe {
+		return m.probe.Init()
+	}
 	return m.welcome.Init()
 }
 
@@ -126,10 +167,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.quitConfirm = newQuitConfirm(m.palette)
 			return m, m.quitConfirm.Init()
 		}
-		// Global `ctrl+t` → cycle theme (lfg → dracula → catppuccin → lfg).
-		// Use ctrl-prefixed so plain `t` stays available as filter input
-		// inside huh.MultiSelect-based pickers.
-		if msg.String() == "ctrl+t" {
+		// Theme cycle. Bound to multiple keys because terminals
+		// vary on whether ctrl+t reaches the app (Ghostty + tmux
+		// sometimes intercept it). Capital T is a reliable fallback
+		// that won't collide with picker filter input (which uses
+		// lowercase t).
+		if msg.String() == "ctrl+t" || msg.String() == "T" {
 			m.theme = nextTheme(m.theme)
 			m.palette = PaletteFor(m.theme)
 			return m.rehydrate()
@@ -142,6 +185,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.screen == screenWelcome {
 			return m, m.welcome.Init()
 		}
+		return m, nil
+	case openInfoMsg:
+		// Stash whatever screen we're on so Esc/Enter inside info can return.
+		m.infoPrev = m.screen
+		m.info = newInfo(m.palette, msg.bundleID, msg.tool, m.screen)
+		m.screen = screenInfo
+		return m, m.info.Init()
+	case closeInfoMsg:
+		// Return to the screen we came from without rebuilding it —
+		// preserves tree-picker cursor + per-screen state.
+		m.screen = m.infoPrev
 		return m, nil
 	}
 
@@ -165,6 +219,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.backup, cmd = m.backup.Update(msg)
 	case screenQuitConfirm:
 		m.quitConfirm, cmd = m.quitConfirm.Update(msg)
+	case screenProbe:
+		m.probe, cmd = m.probe.Update(msg)
+	case screenConfigInput:
+		m.configInput, cmd = m.configInput.Update(msg)
+	case screenInfo:
+		m.info, cmd = m.info.Update(msg)
+	case screenExport:
+		m.export, cmd = m.export.Update(msg)
 	}
 	return m, cmd
 }
@@ -190,6 +252,14 @@ func (m Model) forwardSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		m.backup, cmd = m.backup.Update(msg)
 	case screenQuitConfirm:
 		m.quitConfirm, cmd = m.quitConfirm.Update(msg)
+	case screenProbe:
+		m.probe, cmd = m.probe.Update(msg)
+	case screenConfigInput:
+		m.configInput, cmd = m.configInput.Update(msg)
+	case screenInfo:
+		m.info, cmd = m.info.Update(msg)
+	case screenExport:
+		m.export, cmd = m.export.Update(msg)
 	}
 	return m, cmd
 }
@@ -214,17 +284,39 @@ func (m Model) View() string {
 		return m.backup.View(m.width, m.height)
 	case screenQuitConfirm:
 		return m.quitConfirm.View(m.width, m.height)
+	case screenProbe:
+		return m.probe.View(m.width, m.height)
+	case screenConfigInput:
+		return m.configInput.View(m.width, m.height)
+	case screenInfo:
+		return m.info.View(m.width, m.height)
+	case screenExport:
+		return m.export.View(m.width, m.height)
 	case screenQuit:
 		return ""
 	}
 	return ""
 }
 
+// openInfoMsg pops the info overlay for a tool, remembering the screen
+// to return to. Carried by openInfoCmd from the tree picker.
+type openInfoMsg struct {
+	bundleID string
+	tool     preset.Tool
+}
+
+func openInfoCmd(bundleID string, t preset.Tool) tea.Cmd {
+	return func() tea.Msg { return openInfoMsg{bundleID: bundleID, tool: t} }
+}
+
 // transitionMsg requests a screen change, optionally carrying state.
+// `bundles` lets the probe screen replace the root bundle slice with
+// detect-applied data when handing off to welcome.
 type transitionMsg struct {
 	target            screen
 	selectedBundleIDs map[string]bool
 	selectedTools     map[string]bool
+	bundles           []preset.Bundle
 }
 
 func (m Model) transition(msg transitionMsg) (tea.Model, tea.Cmd) {
@@ -233,6 +325,20 @@ func (m Model) transition(msg transitionMsg) (tea.Model, tea.Cmd) {
 	}
 	if msg.selectedTools != nil {
 		m.selectedTools = msg.selectedTools
+	}
+	if msg.bundles != nil {
+		m.bundles = msg.bundles
+		// Re-derive default bundle pre-selection from the freshly probed
+		// data so the tree picker reflects current state.
+		if len(m.selectedBundleIDs) == 0 {
+			pre := map[string]bool{}
+			for _, b := range m.bundles {
+				if b.Default {
+					pre[b.ID] = true
+				}
+			}
+			m.selectedBundleIDs = pre
+		}
 	}
 	m.screen = msg.target
 
@@ -268,16 +374,34 @@ func (m Model) transition(msg transitionMsg) (tea.Model, tea.Cmd) {
 	case screenQuitConfirm:
 		m.quitConfirm = newQuitConfirm(m.palette)
 		return m, m.quitConfirm.Init()
+	case screenProbe:
+		m.probe = newProbe(m.palette, m.bundles)
+		return m, m.probe.Init()
+	case screenConfigInput:
+		m.configInput = newConfigInput(m.palette)
+		return m, m.configInput.Init()
+	case screenInfo:
+		// Restored after info dialog closes; the model already exists.
+		return m, nil
+	case screenExport:
+		m.export = newExport(m.palette, m.bundles)
+		return m, m.export.Init()
 	case screenQuit:
 		return m, tea.Quit
 	}
 	return m, nil
 }
 
-// nextTheme cycles through the three built-in themes.
+// nextTheme cycles through the built-in themes. Colorblind sits first
+// in the cycle (after the default LFG theme) so accessibility users hit
+// it on the very first Ctrl+T press without hunting through the menu.
+//
+// Order: lfg → colorblind → dracula → catppuccin → lfg
 func nextTheme(t ThemeName) ThemeName {
 	switch t {
 	case ThemeLFG:
+		return ThemeColorblind
+	case ThemeColorblind:
 		return ThemeDracula
 	case ThemeDracula:
 		return ThemeCatppuccin
@@ -323,6 +447,21 @@ func (m Model) rehydrate() (tea.Model, tea.Cmd) {
 	case screenQuitConfirm:
 		m.quitConfirm = newQuitConfirm(m.palette)
 		return m, m.quitConfirm.Init()
+	case screenProbe:
+		// Re-init would restart the probe goroutine and double-fire
+		// detect work. The current probe instance is fine; only the
+		// palette references are stale, and the next paint picks them
+		// up on its own. So just keep the existing model.
+		return m, nil
+	case screenConfigInput:
+		m.configInput = newConfigInput(m.palette)
+		return m, m.configInput.Init()
+	case screenInfo:
+		m.info = newInfo(m.palette, m.info.bundleID, m.info.tool, m.infoPrev)
+		return m, m.info.Init()
+	case screenExport:
+		m.export = newExport(m.palette, m.bundles)
+		return m, m.export.Init()
 	}
 	return m, nil
 }

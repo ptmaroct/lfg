@@ -1,6 +1,8 @@
 package detect
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/ptmaroct/lfg/internal/preset"
@@ -61,6 +63,40 @@ func TestApply_EmptyResults(t *testing.T) {
 	got := Apply(bundles, nil)
 	if got[0].Tools[0].Version != "1" {
 		t.Errorf("empty results should leave preset untouched: %+v", got[0].Tools[0])
+	}
+}
+
+func TestProbeSkill(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	tool := preset.Tool{Name: "agent-browser", Source: "skills"}
+
+	// Not installed yet.
+	if r := Probe(tool); r.Installed {
+		t.Fatalf("expected skill missing, got %+v", r)
+	}
+
+	// Cross-harness directory.
+	dir := filepath.Join(home, ".agents", "skills", "agent-browser")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	r := Probe(tool)
+	if !r.Installed || r.Path != dir {
+		t.Fatalf("expected installed at %s, got %+v", dir, r)
+	}
+
+	// Falls back to ~/.claude/skills/<name> when ~/.agents not present.
+	home2 := t.TempDir()
+	t.Setenv("HOME", home2)
+	claude := filepath.Join(home2, ".claude", "skills", "agent-browser")
+	if err := os.MkdirAll(claude, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	r = Probe(tool)
+	if !r.Installed || r.Path != claude {
+		t.Fatalf("expected claude install at %s, got %+v", claude, r)
 	}
 }
 

@@ -62,6 +62,22 @@ func (m doneModel) View(width, height int) string {
 		desc := lipgloss.NewStyle().Foreground(p.Muted).Render(" · " + s.desc)
 		b.WriteString("  " + num + "  " + cmd + desc + "\n")
 	}
+	b.WriteString("\n")
+
+	// Star CTA + attribution. Centered so it reads as a sign-off.
+	star := lipgloss.NewStyle().Foreground(p.Warn).Bold(true).Render("★")
+	starMsg := lipgloss.NewStyle().Foreground(p.Text).Render("If lfg helped, star us on GitHub")
+	url := lipgloss.NewStyle().Foreground(p.Accent).Underline(true).
+		Render("https://github.com/ptmaroct/lfg")
+	starLine := star + "  " + starMsg
+	b.WriteString(lipgloss.PlaceHorizontal(contentW, lipgloss.Center, starLine))
+	b.WriteString("\n")
+	b.WriteString(lipgloss.PlaceHorizontal(contentW, lipgloss.Center, url))
+	b.WriteString("\n\n")
+	credit := lipgloss.NewStyle().Foreground(p.Muted).Italic(true).
+		Render("Made by Anuj Sharma")
+	b.WriteString(lipgloss.PlaceHorizontal(contentW, lipgloss.Center, credit))
+	b.WriteByte('\n')
 
 	return Frame(p, width, height,
 		"all set",

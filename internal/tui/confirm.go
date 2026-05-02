@@ -21,19 +21,25 @@ import (
 //   4. Two-column preview list (collapses to one column on narrow widths)
 //   5. huh.NewConfirm form (Title disabled — section label owns the
 //      headline, form just renders the buttons)
-//   6. Subtle prototype warning at the bottom
 type confirmModel struct {
-	palette   Palette
-	form      *huh.Form
-	answer    bool
+	palette Palette
+	form    *huh.Form
+	// answer is "go back" (true=back, false=install). The Affirmative
+	// (left) slot is "Back" so back sits on the left of the button row;
+	// Install is on the right and is the default-focused button.
+	// Pointer (not value) so the form's bound accessor and the model's
+	// reads stay coherent across bubbletea's value-receiver copies.
+	answer    *bool
 	toInstall []preset.Tool
 	alreadyOK int
 	bySource  map[string]int
 }
 
 func newConfirm(p Palette, bundles []preset.Bundle, selected map[string]bool) confirmModel {
-	// Default to "install" focused so users can hit Enter immediately.
-	m := confirmModel{palette: p, bySource: map[string]int{}, answer: true}
+	// answer=false → Install (Negative slot, right) is focused so users
+	// can hit Enter immediately to install.
+	answer := false
+	m := confirmModel{palette: p, bySource: map[string]int{}, answer: &answer}
 	for _, b := range bundles {
 		for _, t := range b.Tools {
 			key := b.ID + "/" + t.Name
@@ -51,9 +57,9 @@ func newConfirm(p Palette, bundles []preset.Bundle, selected map[string]bool) co
 	m.form = huh.NewForm(
 		huh.NewGroup(
 			huh.NewConfirm().
-				Affirmative("Install").
-				Negative("Back").
-				Value(&m.answer),
+				Affirmative("Back").
+				Negative("Install").
+				Value(m.answer),
 		),
 	).
 		WithTheme(HuhTheme(p)).
@@ -67,11 +73,11 @@ func (m confirmModel) Init() tea.Cmd { return m.form.Init() }
 func (m confirmModel) Update(msg tea.Msg) (confirmModel, tea.Cmd) {
 	if k, ok := msg.(tea.KeyMsg); ok {
 		switch k.String() {
-		case "esc":
+		case "esc", "backspace", "delete":
 			return m, goTo(screenTree)
-		case "y", "Y":
+		case "i", "I":
 			return m, goTo(screenProgress)
-		case "n", "N":
+		case "b", "B":
 			return m, goTo(screenTree)
 		}
 	}
@@ -81,10 +87,11 @@ func (m confirmModel) Update(msg tea.Msg) (confirmModel, tea.Cmd) {
 		m.form = ff
 	}
 	if m.form.State == huh.StateCompleted {
-		if m.answer {
-			return m, goTo(screenProgress)
+		// answer is bound to Affirmative ("Back"). true=back, false=install.
+		if m.answer != nil && *m.answer {
+			return m, goTo(screenTree)
 		}
-		return m, goTo(screenTree)
+		return m, goTo(screenProgress)
 	}
 	return m, cmd
 }
@@ -128,18 +135,12 @@ func (m confirmModel) View(width, height int) string {
 	// huh form — buttons only. Section label already supplies headline.
 	b.WriteString("  " + m.form.View())
 
-	note := lipgloss.NewStyle().Foreground(p.Muted).Italic(true).
-		Render("  ⚠ UX prototype — installers mocked, no system change.")
-	b.WriteString("\n" + note)
-
 	return Frame(p, width, height,
 		"step 2/2 · confirm",
 		b.String(),
 		HintLine(p,
-			KeyHint(p, "←→", "switch"),
-			KeyHint(p, "Y", "install"),
-			KeyHint(p, "N", "back"),
-			KeyHint(p, "⏎", "select"),
+			KeyHint(p, "I", "install"),
+			KeyHint(p, "B", "back"),
 		),
 		height < 22,
 	)
@@ -149,40 +150,25 @@ func (m confirmModel) View(width, height int) string {
 type statCell struct {
 	label string
 	value string
-	color lipgloss.Color
+	color lipgloss.TerminalColor
 }
 
-// renderStatCells lays out cells side-by-side with rounded borders so each
-// reads as its own readout. Falls back to flat numerals when columns
-// would be too narrow to box cleanly.
+// renderStatCells lays out cells as borderless "value · LABEL" pairs
+// separated by " | ". Boxed-border layout was too fragile across
+// terminal widths (top-right corner intermittently missing) — plain
+// text always renders correctly.
 func renderStatCells(p Palette, contentW int, cells []statCell) string {
 	if len(cells) == 0 {
 		return ""
 	}
-	gap := 2
-	cellW := (contentW - 2 - gap*(len(cells)-1)) / len(cells)
-	if cellW < 14 {
-		return renderStatRow(p, contentW, cells)
-	}
-
-	rendered := make([]string, 0, len(cells))
+	mutedSep := lipgloss.NewStyle().Foreground(p.Subtle).Render("  │  ")
+	parts := make([]string, 0, len(cells))
 	for _, c := range cells {
 		val := lipgloss.NewStyle().Foreground(c.color).Bold(true).Render(c.value)
 		label := lipgloss.NewStyle().Foreground(p.Muted).Render(c.label)
-		body := lipgloss.JoinVertical(lipgloss.Center,
-			lipgloss.PlaceHorizontal(cellW-4, lipgloss.Center, val),
-			lipgloss.PlaceHorizontal(cellW-4, lipgloss.Center, label),
-		)
-		box := lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(p.Subtle).
-			Padding(0, 1).
-			Width(cellW - 2).
-			Render(body)
-		rendered = append(rendered, box)
+		parts = append(parts, val+" "+label)
 	}
-	row := lipgloss.JoinHorizontal(lipgloss.Top, joinWithGap(rendered, gap)...)
-	return "  " + row
+	return "  " + strings.Join(parts, mutedSep)
 }
 
 func joinWithGap(items []string, gap int) []string {
@@ -233,11 +219,27 @@ func renderSources(p Palette, m map[string]int, contentW int) string {
 	return "  " + lipgloss.NewStyle().Foreground(p.Muted).Render("VIA  ") + strings.Join(parts, sep)
 }
 
-// renderPreviewColumns — up to 8 tools laid in two columns.
-// Single column when contentW too narrow to split.
+// renderPreviewColumns — labelled list of tools to install. Always
+// single-column so the labelled columns line up vertically. Layout:
+//
+//	PREVIEW (N total)              CURRENT      VIA
+//	● git                          v2.45.2      brew
+//	● node                         —            mise
+//
+// "CURRENT" = version installed on host now (— when missing).
+// "VIA"     = installer backend that will handle the install.
 func renderPreviewColumns(p Palette, tools []preset.Tool, contentW int) string {
-	header := lipgloss.NewStyle().Foreground(p.Muted).
-		Render(fmt.Sprintf("  PREVIEW  (%d total)", len(tools)))
+	const (
+		nameW    = 28
+		currentW = 12
+	)
+
+	headerStyle := lipgloss.NewStyle().Foreground(p.Muted)
+	header := fmt.Sprintf("  %s   %s  %s",
+		headerStyle.Render(padRightPlain(fmt.Sprintf("PREVIEW  (%d total)", len(tools)), nameW)),
+		headerStyle.Render(padRightPlain("CURRENT", currentW)),
+		headerStyle.Render("VIA"),
+	)
 
 	limit := 8
 	if len(tools) < limit {
@@ -245,53 +247,38 @@ func renderPreviewColumns(p Palette, tools []preset.Tool, contentW int) string {
 	}
 	more := len(tools) - limit
 
-	formatRow := func(t preset.Tool, w int) string {
+	row := func(t preset.Tool) string {
 		dot := lipgloss.NewStyle().Foreground(p.Primary).Render("●")
 		name := lipgloss.NewStyle().Foreground(p.Text).Render(t.Name)
-		src := lipgloss.NewStyle().Foreground(p.Muted).Render(t.Source)
-		nameW := w - 4 - lipgloss.Width(t.Source) - 2
-		if nameW < 8 {
-			nameW = 8
-		}
-		return fmt.Sprintf("%s  %s  %s", dot, padName(name, t.Name, nameW), src)
-	}
+		nameCol := padName(name, t.Name, nameW)
 
-	colW := (contentW - 4) / 2
-	if colW < 28 {
-		var b strings.Builder
-		b.WriteString(header + "\n")
-		for i := 0; i < limit; i++ {
-			b.WriteString("  " + formatRow(tools[i], contentW-4) + "\n")
-		}
-		if more > 0 {
-			b.WriteString("  " + lipgloss.NewStyle().Foreground(p.Muted).Italic(true).
-				Render(fmt.Sprintf("    ... and %d more", more)))
-		}
-		return b.String()
-	}
-
-	half := (limit + 1) / 2
-	left, right := []string{}, []string{}
-	for i := 0; i < half; i++ {
-		left = append(left, "  "+formatRow(tools[i], colW))
-	}
-	for i := half; i < limit; i++ {
-		right = append(right, "  "+formatRow(tools[i], colW))
-	}
-	for len(right) < len(left) {
-		if more > 0 {
-			right = append(right, "  "+lipgloss.NewStyle().Foreground(p.Muted).Italic(true).
-				Render(fmt.Sprintf("    ... +%d more", more)))
-			more = 0
+		var current string
+		if t.Installed {
+			v := t.Version
+			if v == "" {
+				v = "installed"
+			} else {
+				v = "v" + v
+			}
+			current = lipgloss.NewStyle().Foreground(p.Success).Render(v)
 		} else {
-			right = append(right, "")
+			current = lipgloss.NewStyle().Foreground(p.Muted).Render("—")
 		}
+		currentCol := padPlain(current, currentW)
+
+		via := lipgloss.NewStyle().Foreground(p.Muted).Render(t.Source)
+
+		return fmt.Sprintf("%s %s   %s  %s", dot, nameCol, currentCol, via)
 	}
+
 	var b strings.Builder
 	b.WriteString(header + "\n")
-	for i := 0; i < len(left); i++ {
-		l := padPlain(left[i], colW+2)
-		b.WriteString(l + right[i] + "\n")
+	for i := 0; i < limit; i++ {
+		b.WriteString("  " + row(tools[i]) + "\n")
+	}
+	if more > 0 {
+		b.WriteString("  " + lipgloss.NewStyle().Foreground(p.Muted).Italic(true).
+			Render(fmt.Sprintf("    ... and %d more", more)))
 	}
 	return b.String()
 }
