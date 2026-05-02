@@ -305,9 +305,27 @@ func (m treePickerModel) findTool(bundleID, toolName string) preset.Tool {
 
 func (m *treePickerModel) expandAtCursor() {
 	row := m.rows[m.cursor]
-	if row.kind == "bundle" {
-		m.expanded[row.bundleID] = true
-		m.rebuildRows()
+	if row.kind != "bundle" {
+		return
+	}
+	m.expanded[row.bundleID] = true
+	m.rebuildRows()
+	// Anchor the bundle to the top of the viewport so its children
+	// scroll into view below it. Without this, expanding the last
+	// bundle on screen leaves the cursor pinned at the bottom and the
+	// user has to manually scroll to see anything they just revealed.
+	m.offset = m.cursor
+	// Move cursor to the first child so the next ↓ press steps through
+	// the expanded contents naturally (mirrors how filesystem tree
+	// pickers in most editors behave).
+	for i := m.cursor + 1; i < len(m.rows); i++ {
+		if m.rows[i].kind == "tool" && m.rows[i].bundleID == row.bundleID {
+			m.cursor = i
+			break
+		}
+	}
+	if m.cursor >= m.offset+m.pageSize {
+		m.offset = m.cursor - m.pageSize + 1
 	}
 }
 
