@@ -33,20 +33,42 @@ feel great.
 
 ## Screens
 
-**Welcome** — animated gradient `LFG` logo, numbered actions.
+**Welcome** — animated gradient `LFG` logo, numbered actions, theme
+indicator in the top-right of the chrome.
 
 ![welcome](assets/welcome.png)
 
-**Tree picker** — bundles + tools as a collapsible tree. Status dots
-(● all · ◐ partial · ○ none), tabular ID / NAME / STATE / COUNT layout.
+**Tree picker** — bundles + tools as a collapsible tree. Live versions
+resolved from npm registry / brew api / nodejs.org dist index. Tools
+nest under their bundle, `[●]` marks mandatory, `[✓]` marks selected,
+`ALREADY INSTALLED` section calls out anything already on the host.
 
 ![tree](assets/tree.png)
 
-**Themes** — three built-in palettes, cycle live with `Ctrl+T`.
+**Tool info** — `i` on any tool opens an info card. Surfaces the
+homepage / repo, install command, and any `post_install` steps that
+will run after the main install.
 
-| LFG (default) | Dracula | Catppuccin |
-|---|---|---|
-| ![lfg](assets/welcome.png) | ![dracula](assets/welcome-dracula.png) | ![catppuccin](assets/welcome-catppuccin.png) |
+![info](assets/info.png)
+
+**Skills + dev-tools** — pick AI coding CLIs and cross-harness skills.
+Skills bundle is gated until `node-lts` is selected (skills install via
+`npx skills add`).
+
+![tree-skills](assets/tree-skills.png)
+
+**Install** — gradient progress bar, per-task tag column on every log
+line, humanized current step (`Installing Claude Code` not
+`dev-tools/claude-code`).
+
+![install](assets/install.png)
+
+**Themes** — four built-in palettes, cycle live with `Ctrl+T`. Theme
+name is shown in the top-right of every screen so cycles are visible.
+
+| LFG (default) | Dracula | Catppuccin | Colorblind (IBM blue/orange) |
+|---|---|---|---|
+| ![lfg](assets/welcome.png) | ![dracula](assets/welcome-dracula.png) | ![catppuccin](assets/welcome-catppuccin.png) | shipped |
 
 ## Flow
 
@@ -257,9 +279,10 @@ make preview                     # page through every golden in less -R
 make preview ARGS=welcome        # filter goldens by substring
 make widths          # static PNGs per width (needs `freeze`)
 make demo            # animated gif (needs `vhs`)
-make docker          # build container image (Ubuntu + linuxbrew)
+make docker          # build container image (clean Ubuntu 24.04 + lfg binary)
 make docker-run      # launch TUI in container
 make docker-shell    # blank Ubuntu shell, `lfg` on PATH
+make docker-test     # one-shot: build + auto-run `lfg --debug` + bash on exit
 make release-snapshot  # local goreleaser build of all 4 targets (no upload)
 ```
 
@@ -274,29 +297,25 @@ goldens are clean ANSI-stripped text — diffable in any review tool.
 
 ### Testing on a fresh Linux box (Docker)
 
-Smoke-test on a clean machine — no leftover dotfiles, no brew on host,
-no AI CLIs skewing detect. `Dockerfile` builds Ubuntu 24.04 + linuxbrew
-+ the `lfg` binary.
+Smoke-test on a clean machine — no leftover dotfiles, no brew, no AI
+CLIs skewing detect. `Dockerfile` is a bare Ubuntu 24.04 with the
+`lfg` binary baked in; lfg bootstraps everything else (brew, mise,
+node) so the test loop exercises the real install paths.
 
-**Build once** (slow, ~2 min — pulls ubuntu base + installs brew):
-
-```sh
-make docker
-```
-
-After source edits, re-run `make docker`. Layer cache keeps the rebuild
-fast (~10 s — only the Go-build + COPY layers re-run).
-
-**Two ways to use the image:**
+**Tightest loop** — one command rebuilds, runs, auto-launches debug,
+drops you into bash on exit:
 
 ```sh
-make docker-run      # launches ./lfg directly inside the container
-make docker-shell    # drops into bash; `lfg` already on PATH, type it to launch
+make docker-test
 ```
 
-`docker-shell` is the one to use when you want to poke around the
-container, run `lfg` multiple times, or inspect filesystem state
-between runs.
+**Other targets:**
+
+```sh
+make docker          # just build the image (warm cache ~10s)
+make docker-run      # launch TUI in fresh container
+make docker-shell    # bash inside fresh container, `lfg` on PATH
+```
 
 **Verify a custom preset end-to-end** — serve preset from host, point
 container at it:
@@ -309,26 +328,28 @@ python3 -m http.server 8000 --directory testdata
 docker run --rm -it --network host lfg lfg --config http://localhost:8000/sample-preset.toml
 ```
 
-**Reset state** — container is `--rm`, filesystem dies on exit. Each
-`make docker-shell` = fresh `~/.config/lfg/`. Nothing persists unless
-you mount a volume.
+**Reset state** — containers run with `--rm`, filesystem dies on exit.
+Each `make docker-test` = fresh `~/.config/lfg/`. Nothing persists
+unless you mount a volume.
 
 **What to verify in the clean container**:
 
 1. Welcome screen shows 5 menu items (Install / Load config / Export /
    Backup / Quit).
-2. Tree picker: empty `[ ]` clearly visible; `brew` row in `barebones`
-   shows `[●]` (mandatory, can't toggle off).
-3. Confirm screen has labelled `CURRENT` + `VIA` columns.
-4. Skill detection: pre-create `~/.agents/skills/agent-browser/SKILL.md`
-   inside the container and re-run `lfg` — skill should show installed.
-5. Failed install pauses on the screen with the log path printed;
-   transcript at `~/.config/lfg/logs/install-*.log`.
-
-> **Note**: this image pre-installs Homebrew, so it tests the
-> `brew install <pkg>` path but not lfg's brew bootstrap (installing
-> brew when missing). For that, build a bare image without the brew
-> RUN step.
+2. Tree picker: `INSTALLED` column shows `→ v<x.y.z>` for npm/brew
+   tools (live registry lookup); `brew` row sits in `BAREBONES` with a
+   `[●]` mandatory checkbox.
+3. Skills bundle is gated until `node-lts` is selected — toggling
+   blocked with a `REQUIRES node-lts` subheader otherwise.
+4. After install, the lfg-managed `# lfg-managed PATH` block is
+   appended to `~/.bashrc` (and `~/.zshrc` if it exists), idempotent
+   on re-runs. Done screen prints the right reload command for the
+   active shell (`exec bash` / `exec zsh` / `exec fish`).
+5. PostInstall failures (e.g. `agent-browser install` on linux/arm64
+   where Chrome for Testing has no build) surface as warnings — main
+   skill stub still installs cleanly.
+6. Full transcript at `~/.config/lfg/logs/install-*.log`; `--debug`
+   adds a process log alongside.
 
 ## Roadmap
 

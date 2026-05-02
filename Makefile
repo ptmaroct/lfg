@@ -1,5 +1,5 @@
 # lfg — build, test, snapshot, demo
-.PHONY: build run test snap snap-update widths demo docker docker-run docker-shell clean release release-snapshot
+.PHONY: build run test snap snap-update widths demo docker docker-bare docker-run docker-shell docker-test docker-test-bare clean release release-snapshot
 
 build:
 	go build -o lfg ./cmd/lfg
@@ -36,6 +36,12 @@ preview:
 docker:
 	docker build -t lfg .
 
+# Bare ubuntu image — no preinstalled brew. Use to exercise lfg's full
+# brew bootstrap path. Slower per build (~2min on first run) so default
+# `make docker` keeps brew baked in for fast iteration.
+docker-bare:
+	docker build --build-arg INCLUDE_BREW=0 -t lfg-bare .
+
 docker-run:
 	docker run --rm -it lfg
 
@@ -46,6 +52,20 @@ docker-run:
 docker-shell:
 	@docker image inspect lfg >/dev/null 2>&1 || $(MAKE) docker
 	docker run --rm -it --entrypoint bash lfg
+
+# One-shot test loop: rebuild image (so latest binary is baked), launch
+# fresh container, auto-run `lfg --debug`, drop into bash on exit so
+# the user can poke around (cat the install log, run the freshly
+# installed CLIs, etc.). Tightest iteration loop for end-to-end QA.
+docker-test:
+	docker build -t lfg .
+	docker run --rm -it --entrypoint bash lfg -lc 'lfg --debug; echo; echo "--- lfg exited; debug log + transcripts in ~/.config/lfg/logs/ ---"; exec bash'
+
+# Same one-shot loop but on the bare ubuntu image (no preinstalled
+# brew). Use when verifying changes that touch the brew bootstrap.
+docker-test-bare:
+	docker build --build-arg INCLUDE_BREW=0 -t lfg-bare .
+	docker run --rm -it --entrypoint bash lfg-bare -lc 'lfg --debug; echo; echo "--- lfg exited; debug log + transcripts in ~/.config/lfg/logs/ ---"; exec bash'
 
 # Local snapshot release via goreleaser — builds all platforms into
 # ./dist/ without uploading anywhere. Useful for smoke-testing the

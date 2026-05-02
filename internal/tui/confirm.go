@@ -98,13 +98,7 @@ func (m confirmModel) Update(msg tea.Msg) (confirmModel, tea.Cmd) {
 
 func (m confirmModel) View(width, height int) string {
 	p := m.palette
-	canvasW := width - 4
-	if canvasW > 100 {
-		canvasW = 100
-	}
-	if canvasW < 56 {
-		canvasW = 56
-	}
+	canvasW := CanvasW(width)
 	contentW := canvasW - 4
 
 	var b strings.Builder

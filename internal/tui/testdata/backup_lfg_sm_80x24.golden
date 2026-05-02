@@ -1,24 +1,24 @@
-                                                                                  
-                                                                                  
-                                                                                  
-                                                                                  
-                                                                                  
+                                                                                    
+                                                                                    
+                                                                                    
+                                                                                    
+                                                                                    
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-  ▌ lfg │ LOAD CONFIG                                            THEME LFG  
-────────────────────────────────────────────────────────────────────────────
-                                                                            
-┃ LOAD PRESET                                  LOCAL FILE OR HTTP(S) URL    
-                                                                            
-  Paste a TOML preset path. We'll fetch + parse it, then run detect.        
-                                                                            
-  › /path/to/preset.toml or https://example.com/preset.toml                       
-                                                                            
-                                                                            
-────────────────────────────────────────────────────────────────────────────
-  [⏎] LOAD  [⎋] BACK                                                        
+┃  ▌ lfg │ LOAD CONFIG                                          THEME LFG  ┃
+┃──────────────────────────────────────────────────────────────────────────┃
+┃                                                                          ┃
+┃┃ LOAD PRESET                                  LOCAL FILE OR HTTP(S) URL  ┃
+┃                                                                          ┃
+┃  Paste a TOML preset path. We'll fetch + parse it, then run detect.      ┃
+┃                                                                          ┃
+┃  › /path/to/preset.toml or https://example.com/preset.toml                       ┃
+┃                                                                          ┃
+┃                                                                          ┃
+┃──────────────────────────────────────────────────────────────────────────┃
+┃  [⏎] LOAD  [ESC] BACK                                                    ┃
 ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
-                                                                                  
-                                                                                  
-                                                                                  
-                                                                                  
-                                                                                  
+                                                                                    
+                                                                                    
+                                                                                    
+                                                                                    
+                                                                                    

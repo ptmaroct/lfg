@@ -294,6 +294,40 @@ func truncate(s string, n int) string {
 	return s[:n-1] + "…"
 }
 
+// currentLabel humanizes the in-flight step key (e.g.
+// "dev-tools/claude-code") into "Installing Claude Code". Bootstrap
+// steps render as "Installing mise (bootstrap)". Falls back to the raw
+// key if no matching step is found.
+func (m progressModel) currentLabel() string {
+	for _, s := range m.plan {
+		if s.Bootstrap && s.Backend == m.currentT {
+			return "Installing " + humanizeName(s.Backend) + " (bootstrap)"
+		}
+		if !s.Bootstrap && s.Bundle+"/"+s.Tool.Name == m.currentT {
+			return "Installing " + humanizeName(s.Tool.Name)
+		}
+	}
+	return m.currentT
+}
+
+// humanizeName turns a slug ("claude-code", "agent-browser") into
+// title-cased words ("Claude Code", "Agent Browser"). Hyphens and
+// underscores treated as word separators.
+func humanizeName(s string) string {
+	if s == "" {
+		return s
+	}
+	rep := strings.NewReplacer("_", " ", "-", " ")
+	parts := strings.Fields(rep.Replace(s))
+	for i, p := range parts {
+		if p == "" {
+			continue
+		}
+		parts[i] = strings.ToUpper(p[:1]) + p[1:]
+	}
+	return strings.Join(parts, " ")
+}
+
 // shortTool strips the bundle prefix off install keys ("barebones/mise"
 // → "mise") and clamps to 14 cols so the per-line task tag stays in a
 // fixed column. Empty input returns "—" so meta lines emitted without
@@ -313,13 +347,7 @@ func shortTool(s string) string {
 
 func (m progressModel) View(width, height int) string {
 	p := m.palette
-	canvasW := width - 4
-	if canvasW > 100 {
-		canvasW = 100
-	}
-	if canvasW < 56 {
-		canvasW = 56
-	}
+	canvasW := CanvasW(width)
 	contentW := canvasW - 4
 
 	pct := 0.0
@@ -368,7 +396,7 @@ func (m progressModel) View(width, height int) string {
 	current := lipgloss.NewStyle().Foreground(p.Muted).Render("— done —")
 	if !m.done && m.currentT != "" {
 		bold := lipgloss.NewStyle().Foreground(p.Primary).Bold(true)
-		current = fmt.Sprintf("%s %s", m.spinner.View(), bold.Render(m.currentT))
+		current = fmt.Sprintf("%s %s", m.spinner.View(), bold.Render(m.currentLabel()))
 	} else if m.done {
 		if len(m.failed) > 0 {
 			current = lipgloss.NewStyle().Foreground(p.Warn).Bold(true).
@@ -421,13 +449,16 @@ func (m progressModel) View(width, height int) string {
 	}
 
 	hints := []string{
-		KeyHint(p, "⎋", "cancel"),
+		KeyHint(p, "ESC", "cancel"),
 		KeyHint(p, "^C", "quit"),
 	}
 	if m.awaitAck {
+		// Drop the back hint on awaitAck — install already ran, going
+		// "back" can't undo it and just confuses users. Continue is the
+		// only meaningful next action; ^C still quits via the parent
+		// model handler.
 		hints = []string{
 			KeyHint(p, "⏎", "continue"),
-			KeyHint(p, "⎋", "back"),
 		}
 	}
 	return Frame(p, width, height,

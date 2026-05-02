@@ -1,8 +1,10 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -30,6 +32,19 @@ type treePickerModel struct {
 	selected map[string]bool
 	offset   int
 	pageSize int
+	// resolved holds the upstream-registry version for each tool keyed
+	// "<bundleID>/<toolName>". Populated asynchronously by per-tool
+	// goroutines kicked off in Init; missing entries fall back to the
+	// preset's parsed PlannedVersion (e.g. "latest", "lts").
+	resolved map[string]string
+}
+
+// versionResolvedMsg lands when an async registry lookup completes.
+// Empty Version means we couldn't resolve; the model just keeps the
+// PlannedVersion fallback in that case.
+type versionResolvedMsg struct {
+	Key     string // "<bundleID>/<toolName>"
+	Version string
 }
 
 type treeRow struct {
@@ -310,14 +325,12 @@ func (m *treePickerModel) expandAtCursor() {
 	}
 	m.expanded[row.bundleID] = true
 	m.rebuildRows()
-	// Anchor the bundle to the top of the viewport so its children
-	// scroll into view below it. Without this, expanding the last
-	// bundle on screen leaves the cursor pinned at the bottom and the
-	// user has to manually scroll to see anything they just revealed.
-	m.offset = m.cursor
 	// Move cursor to the first child so the next ↓ press steps through
-	// the expanded contents naturally (mirrors how filesystem tree
-	// pickers in most editors behave).
+	// the expanded contents naturally (mirrors filesystem tree pickers
+	// in most editors). Then nudge the viewport ONLY if the cursor
+	// would otherwise fall off the bottom — never force the bundle to
+	// the top, which would push earlier bundles out of sight (the user
+	// still wants to see BAREBONES + DEV-TOOLS while scanning SKILLS).
 	for i := m.cursor + 1; i < len(m.rows); i++ {
 		if m.rows[i].kind == "tool" && m.rows[i].bundleID == row.bundleID {
 			m.cursor = i
@@ -349,9 +362,43 @@ func (m *treePickerModel) collapseAtCursor() {
 	}
 }
 
-func (m treePickerModel) Init() tea.Cmd { return nil }
+func (m treePickerModel) Init() tea.Cmd {
+	// Fan out one async registry lookup per non-installed tool. Each
+	// returns a versionResolvedMsg the Update loop folds into m.resolved
+	// without blocking input. tea.Batch + per-tool tea.Cmd is the
+	// canonical pattern for this kind of fire-and-collect work.
+	cmds := make([]tea.Cmd, 0, 8)
+	for _, b := range m.bundles {
+		for _, t := range b.Tools {
+			if t.Installed {
+				continue
+			}
+			key := b.ID + "/" + t.Name
+			tool := t // capture for closure
+			cmds = append(cmds, func() tea.Msg {
+				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+				defer cancel()
+				v, _ := preset.ResolveVersion(ctx, tool)
+				return versionResolvedMsg{Key: key, Version: v}
+			})
+		}
+	}
+	if len(cmds) == 0 {
+		return nil
+	}
+	return tea.Batch(cmds...)
+}
 
 func (m treePickerModel) Update(msg tea.Msg) (treePickerModel, tea.Cmd) {
+	if r, ok := msg.(versionResolvedMsg); ok {
+		if r.Version != "" {
+			if m.resolved == nil {
+				m.resolved = map[string]string{}
+			}
+			m.resolved[r.Key] = r.Version
+		}
+		return m, nil
+	}
 	if k, ok := msg.(tea.KeyMsg); ok {
 		switch k.String() {
 		case "up", "k":
@@ -430,13 +477,7 @@ func (m treePickerModel) totalSelected() int {
 
 func (m treePickerModel) View(width, height int) string {
 	p := m.palette
-	canvasW := width - 4
-	if canvasW > 100 {
-		canvasW = 100
-	}
-	if canvasW < 56 {
-		canvasW = 56
-	}
+	canvasW := CanvasW(width)
 	contentW := canvasW - 4
 
 	var b strings.Builder
@@ -451,7 +492,25 @@ func (m treePickerModel) View(width, height int) string {
 	b.WriteString("  " + Hairline(p, contentW-2))
 	b.WriteByte('\n')
 
-	end := min2(m.offset+m.pageSize, len(m.rows))
+	// Dynamic page size: chrome around the rows (frame top/bottom,
+	// section label, column header, two hairlines, footer + hints) eats
+	// ~14 rows total. Whatever remains is row capacity. Without this,
+	// pageSize stayed at the constructor default (16) and a tall
+	// terminal still cut off rows that should've been visible — users
+	// had to manually scroll to see what was already on the screen.
+	pageSize := height - 14
+	if pageSize < 6 {
+		pageSize = 6
+	}
+	m.pageSize = pageSize
+	if m.cursor >= m.offset+pageSize {
+		m.offset = m.cursor - pageSize + 1
+	}
+
+	end := m.offset + pageSize
+	if end > len(m.rows) {
+		end = len(m.rows)
+	}
 	for i := m.offset; i < end; i++ {
 		b.WriteString(m.renderRow(i))
 		b.WriteByte('\n')
@@ -470,7 +529,7 @@ func (m treePickerModel) View(width, height int) string {
 			KeyHint(p, "I", "info"),
 			KeyHint(p, "A", "all"),
 			KeyHint(p, "⏎", "next"),
-			KeyHint(p, "⎋", "back"),
+			KeyHint(p, "ESC", "back"),
 		),
 		height < 22,
 	)
@@ -562,8 +621,10 @@ func (m treePickerModel) renderRow(i int) string {
 func (m treePickerModel) renderSubheaderRow(row treeRow) string {
 	p := m.palette
 	style := lipgloss.NewStyle().Foreground(p.Muted).Italic(true)
-	// gridLeading - gridGutterW because gutter is added by renderRow.
-	return strings.Repeat(" ", gridLeading-gridGutterW) + style.Render(row.label)
+	// 2-col indent matches the tool-row nesting offset, plus the
+	// gridLeading-gridGutterW padding so the label aligns with the
+	// NAME column above the rows it introduces.
+	return "  " + strings.Repeat(" ", gridLeading-gridGutterW) + style.Render(row.label)
 }
 
 // renderBundleRow uses the strict shared grid:
@@ -663,6 +724,15 @@ func (m treePickerModel) renderToolRow(row treeRow) string {
 			v = "v" + v
 		}
 		current = lipgloss.NewStyle().Foreground(p.Muted).Render(v)
+	} else if v := m.resolved[row.bundleID+"/"+row.toolName]; v != "" {
+		// Resolved upstream version (npm registry / brew api / nodejs
+		// dist index). Looks like a real semver — render plain.
+		current = lipgloss.NewStyle().Foreground(p.Subtle).Italic(true).Render("→ v" + v)
+	} else if v := tool.PlannedVersion(); v != "" {
+		// Pre-resolution placeholder pulled from the install command
+		// pin (e.g. "lts", "latest"). Replaced once the async fetch in
+		// Init lands a real version.
+		current = lipgloss.NewStyle().Foreground(p.Subtle).Italic(true).Render("→ " + v)
 	} else {
 		current = lipgloss.NewStyle().Foreground(p.Subtle).Render("—")
 	}
@@ -674,8 +744,12 @@ func (m treePickerModel) renderToolRow(row treeRow) string {
 	}
 	src := lipgloss.NewStyle().Foreground(srcColor).Render(tool.Source)
 
+	// 2-col indent telegraphs nesting under the parent bundle. Without
+	// it, tool rows aligned flush with bundle rows and the
+	// parent/child relationship was visually invisible.
+	indent := "  "
 	// box + space + connector + space + name + gap + current + space + src
-	return box + " " + connector + " " + nameCol +
+	return indent + box + " " + connector + " " + nameCol +
 		strings.Repeat(" ", gridGap) + currentCol + " " + src
 }
 

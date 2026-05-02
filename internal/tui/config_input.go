@@ -68,13 +68,7 @@ func (m configInputModel) Update(msg tea.Msg) (configInputModel, tea.Cmd) {
 
 func (m configInputModel) View(width, height int) string {
 	p := m.palette
-	canvasW := width - 4
-	if canvasW > 100 {
-		canvasW = 100
-	}
-	if canvasW < 56 {
-		canvasW = 56
-	}
+	canvasW := CanvasW(width)
 	contentW := canvasW - 4
 
 	var b strings.Builder
@@ -95,7 +89,7 @@ func (m configInputModel) View(width, height int) string {
 		b.String(),
 		HintLine(p,
 			KeyHint(p, "⏎", "load"),
-			KeyHint(p, "⎋", "back"),
+			KeyHint(p, "ESC", "back"),
 		),
 		height < 22,
 	)

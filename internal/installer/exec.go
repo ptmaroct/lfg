@@ -6,8 +6,17 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"regexp"
 	"sync"
 )
+
+// ansiEscape matches CSI/OSC/etc terminal escape sequences. Skill
+// installers (`npx skills add`) emit cursor-move + clear-line escapes
+// inline with their output; if we forward those to the TUI's log tail
+// they bleed through, scramble cursor positioning, and break the
+// bottom of our frame. We strip them at scan time so the tail stores
+// pure text only.
+var ansiEscape = regexp.MustCompile(`\x1b\[[0-9;?]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b[()][AB012]`)
 
 // execRun is the default implementation. Tests swap it for a fake by
 // assigning to the package-level variable.
@@ -59,6 +68,10 @@ func scanLines(wg *sync.WaitGroup, r io.Reader, stream, tool string, out chan<- 
 	sc := bufio.NewScanner(r)
 	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	for sc.Scan() {
-		out <- Line{Tool: tool, Stream: stream, Text: sc.Text()}
+		text := ansiEscape.ReplaceAllString(sc.Text(), "")
+		if text == "" {
+			continue
+		}
+		out <- Line{Tool: tool, Stream: stream, Text: text}
 	}
 }
