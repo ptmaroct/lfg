@@ -152,7 +152,7 @@ func (m confirmModel) View(width, height int) string {
 type statCell struct {
 	label string
 	value string
-	color lipgloss.Color
+	color lipgloss.TerminalColor
 }
 
 // renderStatCells lays out cells side-by-side with rounded borders so each

@@ -79,6 +79,10 @@ func init() {
 	Register(&skillsInstaller{})
 	// brew handles both formulae and casks; "cask" routes through brew.
 	registry["cask"] = registry["brew"]
+	// "curl" is a friendly alias for the custom shell-script runner —
+	// preset entries that install via `curl ... | sh` use Source="curl"
+	// so the VIA column reads accurately instead of the catch-all "custom".
+	registry["curl"] = registry["custom"]
 }
 
 // installCmd picks the right install command for the host OS. Returns

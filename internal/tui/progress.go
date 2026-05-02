@@ -109,7 +109,7 @@ func newProgressWithRunner(p Palette, bundles []preset.Bundle, selected map[stri
 	sp.Style = lipgloss.NewStyle().Foreground(p.Primary)
 
 	bar := progress.New(
-		progress.WithGradient(string(p.Primary), string(p.Success)),
+		progress.WithGradient(hex(p.Primary), hex(p.Success)),
 		progress.WithWidth(60),
 		progress.WithoutPercentage(),
 	)

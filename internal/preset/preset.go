@@ -18,6 +18,9 @@ type Tool struct {
 	InstallLinux string `toml:"install_linux,omitempty"`
 	Binary       string `toml:"binary,omitempty"`    // binary on PATH; defaults to Name
 	SkillURL     string `toml:"skill_url,omitempty"` // for Source="skills"
+	// Homepage is the project's website / repo URL. Surfaced in the
+	// info dialog so users can read more before installing.
+	Homepage string `toml:"homepage,omitempty"`
 	// Mandatory rows can't be unselected in the tree picker. Used for
 	// hard dependencies like Homebrew that other tools build on.
 	Mandatory bool `toml:"mandatory,omitempty"`
@@ -43,51 +46,59 @@ func All() []Bundle {
 			Description: "Universal foundation: Homebrew, Node, Python, runtime managers",
 			Default:     true,
 			Tools: []Tool{
-				// Homebrew — mandatory. Other tools install via brew.
 				{
 					Name: "brew", Source: "custom", Binary: "brew", Mandatory: true,
 					Description:  "Homebrew package manager — required by everything below",
+					Homepage:     "https://brew.sh",
 					InstallMac:   `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`,
 					InstallLinux: `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`,
 				},
-				// Runtime managers + language runtimes.
 				{
 					Name: "mise", Source: "brew", Binary: "mise",
 					Description:  "Polyglot runtime manager (replaces nvm/pyenv/rbenv)",
+					Homepage:     "https://mise.jdx.dev",
 					InstallMac:   "brew install mise",
 					InstallLinux: "curl -fsSL https://mise.run | sh",
 				},
 				{
 					Name: "node-lts", Source: "mise", Binary: "node",
 					Description:  "Node.js LTS via mise",
+					Homepage:     "https://nodejs.org",
 					InstallMac:   "mise use -g node@lts",
 					InstallLinux: "mise use -g node@lts",
 				},
 				{
 					Name: "pnpm", Source: "mise", Binary: "pnpm",
+					Description:  "Fast, disk-space-efficient package manager",
+					Homepage:     "https://pnpm.io",
 					InstallMac:   "mise use -g pnpm@latest",
 					InstallLinux: "mise use -g pnpm@latest",
 				},
 				{
 					Name: "bun", Source: "mise", Binary: "bun",
+					Description:  "All-in-one JavaScript runtime, bundler, package manager",
+					Homepage:     "https://bun.sh",
 					InstallMac:   "mise use -g bun@latest",
 					InstallLinux: "mise use -g bun@latest",
 				},
 				{
 					Name: "yarn", Source: "npm", Binary: "yarn",
-					Description:  "Yarn classic via corepack-style global install",
+					Description:  "Yarn classic — JavaScript package manager",
+					Homepage:     "https://yarnpkg.com",
 					InstallMac:   "npm install -g yarn",
 					InstallLinux: "npm install -g yarn",
 				},
 				{
 					Name: "python", Source: "mise", Binary: "python",
 					Description:  "Python latest via mise",
+					Homepage:     "https://python.org",
 					InstallMac:   "mise use -g python@latest",
 					InstallLinux: "mise use -g python@latest",
 				},
 				{
 					Name: "uv", Source: "custom", Binary: "uv",
-					Description:  "Astral uv — fast Python package manager",
+					Description:  "Astral uv — fast Python package + project manager",
+					Homepage:     "https://docs.astral.sh/uv",
 					InstallMac:   "curl -LsSf https://astral.sh/uv/install.sh | sh",
 					InstallLinux: "curl -LsSf https://astral.sh/uv/install.sh | sh",
 				},
@@ -99,26 +110,30 @@ func All() []Bundle {
 			Description: "AI coding CLIs (Claude Code, Codex, OpenCode, Droid)",
 			Tools: []Tool{
 				{
-					Name: "claude-code", Source: "custom", Binary: "claude",
-					Description:  "Anthropic Claude Code CLI",
+					Name: "claude-code", Source: "curl", Binary: "claude",
+					Description:  "Anthropic's Claude Code CLI — agentic coding in your terminal",
+					Homepage:     "https://docs.claude.com/en/docs/claude-code",
 					InstallMac:   "curl -fsSL https://claude.ai/install.sh | bash",
 					InstallLinux: "curl -fsSL https://claude.ai/install.sh | bash",
 				},
 				{
 					Name: "codex", Source: "npm", Binary: "codex",
-					Description:  "OpenAI Codex CLI (@openai/codex)",
+					Description:  "OpenAI Codex CLI — coding agent from the makers of ChatGPT",
+					Homepage:     "https://github.com/openai/codex",
 					InstallMac:   "npm install -g @openai/codex",
 					InstallLinux: "npm install -g @openai/codex",
 				},
 				{
-					Name: "opencode", Source: "custom", Binary: "opencode",
-					Description:  "sst/opencode — open-source coding agent",
+					Name: "opencode", Source: "curl", Binary: "opencode",
+					Description:  "sst/opencode — open-source TUI coding agent",
+					Homepage:     "https://opencode.ai",
 					InstallMac:   "curl -fsSL https://opencode.ai/install | bash",
 					InstallLinux: "curl -fsSL https://opencode.ai/install | bash",
 				},
 				{
-					Name: "droid", Source: "custom", Binary: "droid",
-					Description:  "Factory AI Droid CLI",
+					Name: "droid", Source: "curl", Binary: "droid",
+					Description:  "Factory AI Droid CLI — software-engineering agents in your terminal",
+					Homepage:     "https://docs.factory.ai/cli/getting-started/quickstart",
 					InstallMac:   "curl -fsSL https://app.factory.ai/cli | sh",
 					InstallLinux: "curl -fsSL https://app.factory.ai/cli | sh",
 				},
@@ -132,26 +147,31 @@ func All() []Bundle {
 				{
 					Name: "agent-browser", Source: "skills",
 					Description: "Headless-browser agent skill",
+					Homepage:    "https://github.com/anthropics/skills/tree/main/agent-browser",
 					SkillURL:    "https://github.com/anthropics/skills/tree/main/agent-browser",
 				},
 				{
 					Name: "frontend-design", Source: "skills",
 					Description: "UI/design review skill",
+					Homepage:    "https://github.com/anthropics/skills/tree/main/frontend-design",
 					SkillURL:    "https://github.com/anthropics/skills/tree/main/frontend-design",
 				},
 				{
 					Name: "db-introspect", Source: "skills",
 					Description: "Database schema introspection skill",
+					Homepage:    "https://github.com/anthropics/skills/tree/main/db-introspect",
 					SkillURL:    "https://github.com/anthropics/skills/tree/main/db-introspect",
 				},
 				{
 					Name: "prompt-eval", Source: "skills",
 					Description: "Prompt eval harness skill",
+					Homepage:    "https://github.com/anthropics/skills/tree/main/prompt-eval",
 					SkillURL:    "https://github.com/anthropics/skills/tree/main/prompt-eval",
 				},
 				{
 					Name: "portless", Source: "skills",
-					Description: "vercel-labs/portless tunnel skill",
+					Description: "vercel-labs/portless — local hostnames for dev servers",
+					Homepage:    "https://github.com/vercel-labs/portless",
 					SkillURL:    "https://github.com/vercel-labs/portless",
 				},
 			},

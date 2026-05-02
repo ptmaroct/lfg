@@ -26,7 +26,7 @@ var lfgLogo = []string{
 
 // Compact single-line gradient text for tiny terminals (height < 22).
 func renderCompactBrand(p Palette, text string) string {
-	return renderGradientString(p.Gradient, strings.ToUpper(text), 0, true)
+	return renderGradientString(gradientColors(p), strings.ToUpper(text), 0, true)
 }
 
 // RenderTitle returns the brand mark, optionally with an animation phase
@@ -52,7 +52,7 @@ func RenderTitle(p Palette, text string, compact bool, phase int) string {
 
 	// Build a wider gradient and shift by phase so colors slide across.
 	// 2× width gives smoother motion without wraparound seams.
-	colors := blend1D(maxW*2, repeatStops(p.Gradient, 2)...)
+	colors := blend1D(maxW*2, repeatStops(gradientColors(p), 2)...)
 
 	var out strings.Builder
 	for li, ln := range lfgLogo {

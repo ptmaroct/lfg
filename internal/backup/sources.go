@@ -26,6 +26,11 @@ var homeDir = func() string {
 	return h
 }
 
+// DefaultSources returns the curated list (read-only). Exposed so the
+// TUI can preview what's about to be backed up before the user
+// confirms the lock-it-or-not prompt.
+func DefaultSources() []Source { return defaultSources() }
+
 // defaultSources returns the curated list of dotfiles + config dirs
 // captured by `lfg backup` for v0.1. Order matters only for stable
 // archive output. Items rooted in $HOME are stored relative to it.
