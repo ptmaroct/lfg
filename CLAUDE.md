@@ -302,6 +302,70 @@ copied to `plan.md` which is gitignored). README has the v0.1 → v1
 roadmap. v0.2 = GitHub auth + remote sync. v0.3 = SSH + macOS defaults.
 Anything not in v0.1 should not land without revisiting that plan.
 
+## Release pipeline
+
+**Two distribution channels, one tap.** `ptmaroct/homebrew-tap`
+holds two formulae:
+
+- `Formula/lfg.rb`     → stable;  `brew install ptmaroct/tap/lfg`
+- `Formula/lfg-beta.rb` → preview; `brew install ptmaroct/tap/lfg-beta`
+
+**Branches drive channels.**
+
+- Push to `main` → `release-please.yml` opens/updates a "Release
+  vX.Y.Z" PR with conventional-commit changelog + manifest bump.
+  Merging the PR tags `vX.Y.Z` → `release.yml` runs goreleaser →
+  binaries land on GitHub Releases AND `lfg.rb` is rewritten in the
+  tap.
+- Push to `develop` → `release-please-beta.yml` opens "Release
+  vX.Y.Z-beta.N" PR. Merge tags the prerelease → goreleaser publishes
+  prerelease binaries AND rewrites `lfg-beta.rb` only (the stable
+  `lfg.rb` is untouched because of `skip_upload: auto` on prereleases).
+
+**Why two release-please workflows + configs?** Each channel needs
+its own `manifest` file (`.release-please-manifest.json` vs
+`.release-please-manifest-beta.json`) so release-please can track the
+last-released version per channel independently. Sharing one manifest
+would make beta increments overwrite stable's last-released marker.
+
+**release-please vs goreleaser ownership.** Both workflows set
+`skip-github-release: true` on the release-please-action input. That's
+deliberate — without it, release-please creates a draft GitHub Release
+the moment it tags, then goreleaser tries to create another release
+with the same tag and fails (`release already exists`). With
+skip-github-release, release-please owns the PR + CHANGELOG.md + tag;
+goreleaser owns the GitHub Release + artifacts + tap formula push.
+
+**Goreleaser two-formula split.** `.goreleaser.yaml` has two `brews:`
+entries pointing at the same tap repo. The `lfg` entry uses
+`skip_upload: auto` so it's automatically skipped on snapshots and
+prereleases. The `lfg-beta` entry uses an inverse template
+(`{{ if and (not .IsSnapshot) .Prerelease }}false{{ else }}true{{ end }}`)
+to publish only on prereleases.
+
+**HOMEBREW_TAP_TOKEN.** Repo secret on `ptmaroct/lfg`; fine-grained
+PAT scoped to `ptmaroct/homebrew-tap` with `Contents: read+write`. Set
+via `printf '%s' '<token>' | gh secret set HOMEBREW_TAP_TOKEN --repo
+ptmaroct/lfg`. **Do NOT use `--body -`** — gh treats the dash as a
+literal value, not a stdin marker, and you'll silently set the secret
+to the string "-". Prior outage took two CI runs to diagnose because
+the goreleaser logs show "***" for both a real token and the literal
+"-".
+
+**Manual fallback for a stuck release.** If the formula push fails
+but binaries published, do not hand-craft a `Formula/lfg.rb` and push
+it to the tap as if goreleaser wrote it — the impersonation breaks
+trust + bypasses signing. Instead: fix the secret, then bump to the
+next patch version (e.g. v0.3.1 broken → tag v0.3.2). Re-using the
+same tag means new tarballs with different BuildDates → different
+SHA256s, which would break anyone who downloaded between attempts.
+
+**Goreleaser deprecation warning.** `brews:` shows a "phasing out in
+favor of homebrew_casks" warning at run time. Misleading — `brews:`
+is for formulae, `homebrew_casks:` is for casks (gui apps). The
+warning can be ignored until goreleaser actually breaks the key. If
+they ever do, both formula entries need migrating.
+
 ## Things to avoid
 
 - Re-enabling huh `Group.Base` border without removing the outer Frame card.
@@ -323,6 +387,19 @@ Anything not in v0.1 should not land without revisiting that plan.
   `.bashrc`. Login-shell bash sources `.bash_profile` instead. Plain
   `exec bash` re-runs as interactive (since stdin is a tty) and
   sources the right file.
+- `gh secret set NAME --body -` thinking the dash is a stdin marker —
+  it's literal, and you'll set the secret to "-". Use plain
+  `printf '%s' "$value" | gh secret set NAME` instead.
+- Hand-writing `Formula/lfg.rb` and pushing it to the tap to "unblock"
+  a failed release. Goreleaser's signing/authorship is the trust
+  anchor; manual pushes bypass it. See "Release pipeline" above.
+- Re-using a tag (e.g. re-pushing v0.3.1 after deleting it) when
+  binaries were briefly public. New goreleaser run produces new
+  BuildDate-baked tarballs with different SHA256s; anyone who pulled
+  the first set is broken. Always bump to the next patch instead.
+- Letting both release-please and goreleaser create the GitHub Release.
+  Set `skip-github-release: true` on the release-please-action input;
+  goreleaser is the sole release publisher.
 - Forwarding raw subprocess stdout to the TUI log tail without
   stripping ANSI escapes — fancy installers (npx skills add) emit
   cursor-move sequences that scramble the frame.

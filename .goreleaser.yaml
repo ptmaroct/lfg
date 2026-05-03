@@ -67,6 +67,16 @@ changelog:
       - "Merge pull request"
       - "Merge branch"
 
+# Two formulae publish to the same tap (ptmaroct/homebrew-tap):
+#
+#   lfg      → stable channel; written on tags like v0.3.2
+#   lfg-beta → preview channel; written on prerelease tags like
+#              v0.4.0-beta.1 (driven by the develop branch +
+#              release-please-config-beta.json).
+#
+# `skip_upload: auto` skips the stable formula on snapshots/prereleases.
+# The lfg-beta formula uses an inverse template so it only writes on
+# prereleases.
 brews:
   - name: lfg
     repository:
@@ -77,6 +87,7 @@ brews:
     homepage: https://github.com/ptmaroct/lfg
     description: TUI bootstrap CLI for new dev machines
     license: MIT
+    skip_upload: auto
     commit_author:
       name: goreleaserbot
       email: bot@goreleaser.com
@@ -84,6 +95,30 @@ brews:
       system "#{bin}/lfg", "version"
     install: |
       bin.install "lfg"
+
+  - name: lfg-beta
+    repository:
+      owner: ptmaroct
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    homepage: https://github.com/ptmaroct/lfg
+    description: TUI bootstrap CLI for new dev machines (beta channel)
+    license: MIT
+    # Only publish on prereleases. `IsSnapshot` covers `make release-snapshot`
+    # so local dev never tries to push.
+    skip_upload: '{{ if and (not .IsSnapshot) .Prerelease }}false{{ else }}true{{ end }}'
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    test: |
+      system "#{bin}/lfg", "version"
+    install: |
+      bin.install "lfg"
+    # Caveat shown by `brew info lfg-beta`.
+    caveats: |
+      lfg-beta is the preview channel — expect rough edges.
+      Stable lives at `brew install ptmaroct/tap/lfg`.
 
 release:
   github:

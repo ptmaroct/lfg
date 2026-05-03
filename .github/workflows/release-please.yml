@@ -1,0 +1,35 @@
+# release-please drives stable releases on the main branch.
+#
+# On every push to main it parses conventional commits since the last
+# release tag and either updates an existing "Release vX.Y.Z" PR or
+# opens a new one. When that PR is merged it tags vX.Y.Z, which kicks
+# off .github/workflows/release.yml (goreleaser) to build binaries and
+# publish the Homebrew formula.
+#
+# See release-please-config.json + .release-please-manifest.json.
+
+name: release-please
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          target-branch: main
+          # release-please only manages the PR + tag; the actual GitHub
+          # Release (with artifacts) is published by goreleaser when it
+          # picks up the tag push. Two creators on the same tag race.
+          skip-github-release: true

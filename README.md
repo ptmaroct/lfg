@@ -18,6 +18,9 @@ Homebrew (macOS + Linux):
 brew install ptmaroct/tap/lfg
 ```
 
+Want the preview channel? `brew install ptmaroct/tap/lfg-beta` follows the
+`develop` branch — newer features, fewer guarantees.
+
 Or via the curl one-liner:
 
 ```sh
