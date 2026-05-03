@@ -18,6 +18,7 @@ const (
 	screenConfirm
 	screenCreds // MCP credentials wizard, between confirm and progress
 	screenProgress
+	screenAliases // optional shell aliases — between progress and done
 	screenDone
 	screenBackupPrompt
 	screenBackupDone
@@ -47,6 +48,7 @@ type Model struct {
 	confirm      confirmModel
 	creds        credsModel
 	progress     progressModel
+	aliases      aliasesModel
 	done         doneModel
 	backup       backupModel
 	quitConfirm  quitConfirmModel
@@ -58,6 +60,14 @@ type Model struct {
 
 	selectedBundleIDs map[string]bool
 	selectedTools     map[string]bool // key = bundleID + "/" + toolName
+
+	// Alias state. aliasGroups is the catalog (defaults or config-driven);
+	// selectedAliases keys are <group>/<aliasName>; aliasConflicts maps
+	// alias name → "<rc-basename>:<line>" for pre-existing definitions
+	// outside the lfg-managed block (populated during the probe phase).
+	aliasGroups     []preset.AliasGroup
+	selectedAliases map[string]bool
+	aliasConflicts  map[string]string
 
 	// progressRunner is injected via WithProgressRunner; nil → mock.
 	progressRunner ProgressRunner
@@ -86,8 +96,19 @@ func New(theme ThemeName) Model {
 
 // NewWithBundles is the explicit constructor used after a detect pass.
 // Pass the bundle slice with Installed/Version fields already overlaid
-// (see internal/detect.Apply).
+// (see internal/detect.Apply). Defaults aliases to the built-in
+// catalog with no conflict map; callers wanting config-driven aliases
+// or pre-probed conflicts should use NewWithBundlesAndAliases.
 func NewWithBundles(theme ThemeName, bundles []preset.Bundle, opts ...Option) Model {
+	return NewWithBundlesAndAliases(theme, bundles, preset.DefaultAliases(), nil, opts...)
+}
+
+// NewWithBundlesAndAliases is the full constructor — bundles + alias
+// catalog + alias conflict map (probed from rc files). Callers driven
+// by --config thread their parsed catalog through here so the alias
+// picker honors the config as source of truth (REPLACE semantics, same
+// as bundle precedence).
+func NewWithBundlesAndAliases(theme ThemeName, bundles []preset.Bundle, aliasGroups []preset.AliasGroup, conflicts map[string]string, opts ...Option) Model {
 	p := PaletteFor(theme)
 	pre := map[string]bool{}
 	for _, bundle := range bundles {
@@ -102,6 +123,8 @@ func NewWithBundles(theme ThemeName, bundles []preset.Bundle, opts ...Option) Mo
 		bundles:           bundles,
 		selectedBundleIDs: pre,
 		selectedTools:     map[string]bool{},
+		aliasGroups:       aliasGroups,
+		aliasConflicts:    conflicts,
 	}
 	m.welcome = newWelcome(p)
 	for _, o := range opts {
@@ -115,8 +138,16 @@ func NewWithBundles(theme ThemeName, bundles []preset.Bundle, opts ...Option) Mo
 // instead of a frozen terminal. The probe screen runs detect.ProbeAll
 // in the background, then transitions to welcome with the result-applied
 // bundles. Snapshot tests intentionally use New / NewWithBundles so they
-// skip the probe step (deterministic state).
+// skip the probe step (deterministic state). Alias catalog defaults to
+// the built-in set; use NewWithProbeAndAliases for config-driven catalog.
 func NewWithProbe(theme ThemeName, raw []preset.Bundle, opts ...Option) Model {
+	return NewWithProbeAndAliases(theme, raw, preset.DefaultAliases(), opts...)
+}
+
+// NewWithProbeAndAliases lets callers thread a custom alias catalog
+// through the probe-first startup path. Alias conflicts get probed
+// alongside detect and arrive via probeAliasesMsg.
+func NewWithProbeAndAliases(theme ThemeName, raw []preset.Bundle, aliasGroups []preset.AliasGroup, opts ...Option) Model {
 	p := PaletteFor(theme)
 	pre := map[string]bool{}
 	for _, bundle := range raw {
@@ -131,6 +162,7 @@ func NewWithProbe(theme ThemeName, raw []preset.Bundle, opts ...Option) Model {
 		bundles:           raw,
 		selectedBundleIDs: pre,
 		selectedTools:     map[string]bool{},
+		aliasGroups:       aliasGroups,
 	}
 	m.probe = newProbe(p, raw)
 	for _, o := range opts {
@@ -149,6 +181,13 @@ func (m Model) Init() tea.Cmd {
 // Theme returns the currently active theme name. Used by the CLI layer
 // to persist theme changes (Ctrl+T cycling) on clean exit.
 func (m Model) Theme() ThemeName { return m.theme }
+
+// SelectedAliases returns the resolved alias slice the user picked,
+// in catalog order. Used by the CLI layer to write the lfg-managed
+// alias block to shell rc files after the TUI exits.
+func (m Model) SelectedAliases() []preset.Alias {
+	return resolveSelectedAliases(m.aliasGroups, m.selectedAliases)
+}
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -217,6 +256,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.creds, cmd = m.creds.Update(msg)
 	case screenProgress:
 		m.progress, cmd = m.progress.Update(msg)
+	case screenAliases:
+		m.aliases, cmd = m.aliases.Update(msg)
 	case screenDone:
 		m.done, cmd = m.done.Update(msg)
 	case screenBackupPrompt, screenBackupDone:
@@ -252,6 +293,8 @@ func (m Model) forwardSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		m.creds, cmd = m.creds.Update(msg)
 	case screenProgress:
 		m.progress, cmd = m.progress.Update(msg)
+	case screenAliases:
+		m.aliases, cmd = m.aliases.Update(msg)
 	case screenDone:
 		m.done, cmd = m.done.Update(msg)
 	case screenBackupPrompt, screenBackupDone:
@@ -286,6 +329,8 @@ func (m Model) View() string {
 		return m.creds.View(m.width, m.height)
 	case screenProgress:
 		return m.progress.View(m.width, m.height)
+	case screenAliases:
+		return m.aliases.View(m.width, m.height)
 	case screenDone:
 		return m.done.View(m.width, m.height)
 	case screenBackupPrompt, screenBackupDone:
@@ -319,12 +364,19 @@ func openInfoCmd(bundleID string, t preset.Tool) tea.Cmd {
 
 // transitionMsg requests a screen change, optionally carrying state.
 // `bundles` lets the probe screen replace the root bundle slice with
-// detect-applied data when handing off to welcome.
+// detect-applied data when handing off to welcome. `selectedAliases`
+// flows out of the alias picker; `aliasConflicts` flows in from the
+// probe phase. `aliasGroups` lets a runtime --config load (from the
+// welcome screen) swap the alias catalog mid-session.
 type transitionMsg struct {
 	target            screen
 	selectedBundleIDs map[string]bool
 	selectedTools     map[string]bool
+	selectedAliases   map[string]bool
 	bundles           []preset.Bundle
+	aliasGroups       []preset.AliasGroup
+	aliasConflicts    map[string]string
+	replaceAliases    bool // when true, aliasGroups replaces (even if empty)
 }
 
 func (m Model) transition(msg transitionMsg) (tea.Model, tea.Cmd) {
@@ -333,6 +385,18 @@ func (m Model) transition(msg transitionMsg) (tea.Model, tea.Cmd) {
 	}
 	if msg.selectedTools != nil {
 		m.selectedTools = msg.selectedTools
+	}
+	if msg.selectedAliases != nil {
+		m.selectedAliases = msg.selectedAliases
+	}
+	if msg.aliasConflicts != nil {
+		m.aliasConflicts = msg.aliasConflicts
+	}
+	if msg.replaceAliases {
+		m.aliasGroups = msg.aliasGroups
+		// Reset prior selection when the catalog changes — the keys
+		// (group/name) likely don't carry over to the new catalog.
+		m.selectedAliases = nil
 	}
 	if msg.bundles != nil {
 		m.bundles = msg.bundles
@@ -376,8 +440,11 @@ func (m Model) transition(msg transitionMsg) (tea.Model, tea.Cmd) {
 		}
 		m.progress = newProgressWithRunner(m.palette, m.bundles, m.selectedTools, runner)
 		return m, m.progress.Init()
+	case screenAliases:
+		m.aliases = newAliases(m.palette, m.aliasGroups, m.selectedAliases, m.aliasConflicts)
+		return m, m.aliases.Init()
 	case screenDone:
-		m.done = newDone(m.palette, m.bundles, m.selectedTools)
+		m.done = newDone(m.palette, m.bundles, m.selectedTools, resolveSelectedAliases(m.aliasGroups, m.selectedAliases))
 		return m, m.done.Init()
 	case screenBackupPrompt:
 		m.backup = newBackup(m.palette)
@@ -395,7 +462,7 @@ func (m Model) transition(msg transitionMsg) (tea.Model, tea.Cmd) {
 		// Restored after info dialog closes; the model already exists.
 		return m, nil
 	case screenExport:
-		m.export = newExport(m.palette, m.bundles)
+		m.export = newExport(m.palette, m.bundles, flattenGroups(m.aliasGroups))
 		return m, m.export.Init()
 	case screenQuit:
 		return m, tea.Quit
@@ -452,8 +519,11 @@ func (m Model) rehydrate() (tea.Model, tea.Cmd) {
 		}
 		m.progress = newProgressWithRunner(m.palette, m.bundles, m.selectedTools, runner)
 		return m, m.progress.Init()
+	case screenAliases:
+		m.aliases = newAliases(m.palette, m.aliasGroups, m.selectedAliases, m.aliasConflicts)
+		return m, m.aliases.Init()
 	case screenDone:
-		m.done = newDone(m.palette, m.bundles, m.selectedTools)
+		m.done = newDone(m.palette, m.bundles, m.selectedTools, resolveSelectedAliases(m.aliasGroups, m.selectedAliases))
 		return m, m.done.Init()
 	case screenBackupPrompt, screenBackupDone:
 		m.backup = newBackup(m.palette)
@@ -474,7 +544,7 @@ func (m Model) rehydrate() (tea.Model, tea.Cmd) {
 		m.info = newInfo(m.palette, m.info.bundleID, m.info.tool, m.infoPrev)
 		return m, m.info.Init()
 	case screenExport:
-		m.export = newExport(m.palette, m.bundles)
+		m.export = newExport(m.palette, m.bundles, flattenGroups(m.aliasGroups))
 		return m, m.export.Init()
 	}
 	return m, nil

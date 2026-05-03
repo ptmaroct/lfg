@@ -49,14 +49,20 @@ func (m configInputModel) Update(msg tea.Msg) (configInputModel, tea.Cmd) {
 				m.err = "enter a path or URL"
 				return m, nil
 			}
-			bundles, err := preset.Load(spec)
+			loaded, err := preset.Load(spec)
 			if err != nil {
 				m.err = err.Error()
 				return m, nil
 			}
 			m.err = ""
+			groups := preset.GroupAliases(preset.FilterAliasesForHost(loaded.Aliases))
 			return m, func() tea.Msg {
-				return transitionMsg{target: screenProbe, bundles: bundles}
+				return transitionMsg{
+					target:         screenProbe,
+					bundles:        preset.FilterForHost(loaded.Bundles),
+					aliasGroups:    groups,
+					replaceAliases: true,
+				}
 			}
 		}
 	}

@@ -21,21 +21,23 @@ import (
 //
 // Lifecycle:
 //
-//  1. Init kicks off ProbeAllStream in a goroutine + arms the spinner +
-//     a "wait next probe step" cmd.
+//  1. Init kicks off ProbeAllStream + ProbeAliases in goroutines plus
+//     arms the spinner + "wait next probe step" cmd.
 //  2. Each probeStepMsg increments `done` and appends a log line.
 //  3. When the channel closes (probeDoneMsg), we apply the results onto
 //     the raw bundles, set the harness slice on the installer package,
-//     and emit a transitionMsg carrying the probed bundles to welcome.
+//     and emit a transitionMsg carrying the probed bundles + alias
+//     conflict map to welcome.
 type probeModel struct {
-	palette Palette
-	bundles []preset.Bundle // raw, pre-probe
-	spinner spinner.Model
-	bar     progress.Model
-	total   int
-	done    int
-	current string
-	results map[string]detect.Result
+	palette        Palette
+	bundles        []preset.Bundle // raw, pre-probe
+	spinner        spinner.Model
+	bar            progress.Model
+	total          int
+	done           int
+	current        string
+	results        map[string]detect.Result
+	aliasConflicts map[string]string
 
 	stream chan detect.ProbeStep
 }
@@ -44,6 +46,11 @@ type probeStepMsg detect.ProbeStep
 type probeDoneMsg struct {
 	bundles []preset.Bundle
 }
+
+// probeAliasesMsg carries the rc-alias conflict map back from the
+// goroutine that scans the user's shell rcs in parallel with detect.
+// Keyed by alias name → "<rc-basename>:<lineno>".
+type probeAliasesMsg map[string]string
 
 func newProbe(p Palette, bundles []preset.Bundle) probeModel {
 	sp := spinner.New()
@@ -74,7 +81,14 @@ func newProbe(p Palette, bundles []preset.Bundle) probeModel {
 
 func (m probeModel) Init() tea.Cmd {
 	go detect.ProbeAllStream(m.bundles, m.stream)
-	return tea.Batch(m.spinner.Tick, m.waitStep())
+	// Alias rc-scan runs in parallel with detect; it reads small files
+	// and finishes well before detect, but we want it to land as a
+	// message so the root model can stash conflicts before the alias
+	// screen mounts.
+	scanAliases := func() tea.Msg {
+		return probeAliasesMsg(detect.ProbeAliases())
+	}
+	return tea.Batch(m.spinner.Tick, m.waitStep(), scanAliases)
 }
 
 // waitStep returns a cmd that pulls one ProbeStep off the channel. When
@@ -106,11 +120,15 @@ func (m probeModel) Update(msg tea.Msg) (probeModel, tea.Cmd) {
 		m.current = step.Tool.Name
 		m.results[step.Key] = step.Result
 		return m, m.waitStep()
+	case probeAliasesMsg:
+		m.aliasConflicts = msg
+		return m, nil
 	case probeDoneMsg:
 		final := detect.Apply(m.bundles, m.results)
 		installer.SetHarnesses(detect.DetectedHarnesses())
+		conflicts := m.aliasConflicts
 		return m, func() tea.Msg {
-			return transitionMsg{target: screenWelcome, bundles: final}
+			return transitionMsg{target: screenWelcome, bundles: final, aliasConflicts: conflicts}
 		}
 	case tea.KeyMsg:
 		// Allow the user to skip the probe screen with Enter / Esc.
@@ -121,8 +139,9 @@ func (m probeModel) Update(msg tea.Msg) (probeModel, tea.Cmd) {
 		case "enter", "esc":
 			final := detect.Apply(m.bundles, m.results)
 			installer.SetHarnesses(detect.DetectedHarnesses())
+			conflicts := m.aliasConflicts
 			return m, func() tea.Msg {
-				return transitionMsg{target: screenWelcome, bundles: final}
+				return transitionMsg{target: screenWelcome, bundles: final, aliasConflicts: conflicts}
 			}
 		}
 	}

@@ -19,10 +19,23 @@ type doneModel struct {
 	palette  Palette
 	bundles  []preset.Bundle
 	selected map[string]bool
+	aliases  []preset.Alias
 }
 
-func newDone(p Palette, bundles []preset.Bundle, selected map[string]bool) doneModel {
-	return doneModel{palette: p, bundles: bundles, selected: selected}
+func newDone(p Palette, bundles []preset.Bundle, selected map[string]bool, aliases []preset.Alias) doneModel {
+	return doneModel{palette: p, bundles: bundles, selected: selected, aliases: aliases}
+}
+
+// hasReloadAlias reports whether the user picked the `reload` shortcut,
+// in which case the next-step "reload your shell" command can be the
+// short alias instead of the literal `exec bash`/`exec zsh`.
+func (m doneModel) hasReloadAlias() bool {
+	for _, a := range m.aliases {
+		if a.Name == "reload" {
+			return true
+		}
+	}
+	return false
 }
 
 func (m doneModel) Init() tea.Cmd { return nil }
@@ -57,6 +70,9 @@ func (m doneModel) View(width, height int) string {
 	b.WriteString("\n\n")
 
 	reload := reloadShellCmd()
+	if m.hasReloadAlias() {
+		reload = "reload"
+	}
 	steps := []struct{ cmd, desc string }{
 		{reload, "reload your shell (PATH updates already written to your rc)"},
 		{"lfg backup", "snapshot this machine"},
@@ -81,6 +97,25 @@ func (m doneModel) View(width, height int) string {
 		boxStyle := lipgloss.NewStyle().Foreground(p.Text).Background(p.Panel).Padding(0, 1)
 		for _, ev := range envs {
 			b.WriteString("  " + boxStyle.Render("export "+ev+"=...") + "\n")
+		}
+		b.WriteString("\n")
+	}
+
+	// Aliases section — only shown when the user picked at least one.
+	// Renders one line per alias with `name → expansion`, mirroring the
+	// env vars boxStyle so the section reads as a status report rather
+	// than something the user still has to act on.
+	if len(m.aliases) > 0 {
+		b.WriteString(SectionLabel(p, "Aliases configured",
+			fmt.Sprintf("written to your shell rc · %d total", len(m.aliases)), contentW))
+		b.WriteString("\n\n")
+		nameStyle := lipgloss.NewStyle().Foreground(p.Primary).Bold(true)
+		arrowStyle := lipgloss.NewStyle().Foreground(p.Muted)
+		cmdStyle := lipgloss.NewStyle().Foreground(p.Text)
+		for _, a := range m.aliases {
+			b.WriteString("  " + nameStyle.Render(fmt.Sprintf("%-7s", a.Name)) +
+				arrowStyle.Render("→  ") +
+				cmdStyle.Render(a.Command) + "\n")
 		}
 		b.WriteString("\n")
 	}
