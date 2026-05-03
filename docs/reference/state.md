@@ -20,8 +20,8 @@ description: What lfg writes under ~/.config/lfg/ and what each file is for.
 ```json
 {
   "theme": "dracula",
-  "version": "v0.3.0",
-  "lastBundles": ["barebones", "ai-harnesses"]
+  "version": "v0.4.0",
+  "lastBundles": ["barebones", "terminal-essentials", "ai-harnesses"]
 }
 ```
 
