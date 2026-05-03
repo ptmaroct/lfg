@@ -2,9 +2,9 @@
 #
 # Required secrets / permissions:
 #   - GITHUB_TOKEN        provided automatically; needs `contents: write`
-#   - HOMEBREW_TAP_TOKEN  optional; only when the brews block in
-#                         .goreleaser.yaml is uncommented + the tap repo
-#                         exists at github.com/ptmaroct/homebrew-tap.
+#   - HOMEBREW_TAP_TOKEN  PAT with `contents: write` on
+#                         github.com/ptmaroct/homebrew-tap; goreleaser
+#                         pushes the generated Formula/lfg.rb there.
 
 name: release
 
@@ -39,4 +39,4 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
