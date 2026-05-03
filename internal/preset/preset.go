@@ -3,6 +3,31 @@
 // preset.Load — see loader.go.
 package preset
 
+import "runtime"
+
+// FilterForHost drops tools whose Skip{Mac,Linux} flag matches the
+// running OS. Returns a new slice; input is not mutated. Bundles with
+// every tool filtered are still returned (empty Tools); callers that
+// want to hide empty bundles should filter again.
+func FilterForHost(bundles []Bundle) []Bundle {
+	out := make([]Bundle, len(bundles))
+	for i, b := range bundles {
+		nb := b
+		nb.Tools = make([]Tool, 0, len(b.Tools))
+		for _, t := range b.Tools {
+			if runtime.GOOS == "darwin" && t.SkipMac {
+				continue
+			}
+			if runtime.GOOS != "darwin" && t.SkipLinux {
+				continue
+			}
+			nb.Tools = append(nb.Tools, t)
+		}
+		out[i] = nb
+	}
+	return out
+}
+
 // Tool represents a single installable item.
 //
 // InstallMac and InstallLinux capture the platform-specific install
@@ -73,6 +98,12 @@ type Tool struct {
 	// only live in memory + in the harness configs the installer writes
 	// (which lfg treats as the user's responsibility to protect).
 	MCPCredentials map[string]string `toml:"-"`
+	// SkipMac / SkipLinux hide a tool from the picker on the named OS.
+	// Use when an upstream has no install path on that platform (e.g.
+	// ghostty has no Linux brew formula) or when the host OS already
+	// ships a satisfactory equivalent (e.g. macOS bundles a recent zsh).
+	SkipMac   bool `toml:"skip_mac,omitempty"`
+	SkipLinux bool `toml:"skip_linux,omitempty"`
 }
 
 // PlannedVersion returns the version string lfg will install for this
@@ -172,8 +203,9 @@ type Bundle struct {
 }
 
 // All returns the bundles shipped with the CLI by default. Three
-// bundles: barebones (universal foundation), dev-tools (AI coding
-// CLIs), skills (cross-harness skill packs).
+// bundles: barebones (universal foundation), terminal-essentials
+// (interactive shell tooling), ai-harnesses (AI coding CLIs), skills
+// (cross-harness skill packs), mcp (Model Context Protocol servers).
 func All() []Bundle {
 	return []Bundle{
 		{
@@ -241,8 +273,64 @@ func All() []Bundle {
 			},
 		},
 		{
-			ID:          "dev-tools",
-			Name:        "dev-tools",
+			ID:          "terminal-essentials",
+			Name:        "terminal-essentials",
+			Description: "Interactive shell quality-of-life: zoxide, ripgrep, lazygit, tailscale, tmux, ghostty, zsh",
+			Tools: []Tool{
+				{
+					Name: "zoxide", Source: "brew", Binary: "zoxide",
+					Description:  "Smarter cd that learns your habits",
+					Homepage:     "https://github.com/ajeetdsouza/zoxide",
+					InstallMac:   "brew install zoxide",
+					InstallLinux: "brew install zoxide",
+				},
+				{
+					Name: "ripgrep", Source: "brew", Binary: "rg",
+					Description:  "Fast recursive grep (rg)",
+					Homepage:     "https://github.com/BurntSushi/ripgrep",
+					InstallMac:   "brew install ripgrep",
+					InstallLinux: "brew install ripgrep",
+				},
+				{
+					Name: "lazygit", Source: "brew", Binary: "lazygit",
+					Description:  "Terminal UI for git",
+					Homepage:     "https://github.com/jesseduffield/lazygit",
+					InstallMac:   "brew install lazygit",
+					InstallLinux: "brew install lazygit",
+				},
+				{
+					Name: "tailscale", Source: "brew", Binary: "tailscale",
+					Description:  "Zero-config VPN mesh",
+					Homepage:     "https://tailscale.com",
+					InstallMac:   "brew install tailscale",
+					InstallLinux: "brew install tailscale",
+				},
+				{
+					Name: "tmux", Source: "brew", Binary: "tmux",
+					Description:  "Terminal multiplexer",
+					Homepage:     "https://github.com/tmux/tmux",
+					InstallMac:   "brew install tmux",
+					InstallLinux: "brew install tmux",
+				},
+				{
+					Name: "ghostty", Source: "cask", Binary: "ghostty",
+					Description: "Fast GPU-accelerated terminal emulator",
+					Homepage:    "https://ghostty.org",
+					InstallMac:  "brew install --cask ghostty",
+					SkipLinux:   true,
+				},
+				{
+					Name: "zsh", Source: "brew", Binary: "zsh",
+					Description:  "Z shell — modern interactive shell",
+					Homepage:     "https://www.zsh.org",
+					InstallLinux: "brew install zsh",
+					SkipMac:      true,
+				},
+			},
+		},
+		{
+			ID:          "ai-harnesses",
+			Name:        "ai-harnesses",
 			Description: "AI coding CLIs (Claude Code, Codex, OpenCode, Droid)",
 			Tools: []Tool{
 				{

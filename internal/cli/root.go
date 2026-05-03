@@ -127,13 +127,13 @@ func applyBg() {
 // want to silently fall back to defaults under their nose.
 func loadPreset() ([]preset.Bundle, error) {
 	if configFlag == "" {
-		return preset.All(), nil
+		return preset.FilterForHost(preset.All()), nil
 	}
 	bundles, err := preset.Load(configFlag)
 	if err != nil {
 		return nil, fmt.Errorf("load preset %q: %w", configFlag, err)
 	}
-	return bundles, nil
+	return preset.FilterForHost(bundles), nil
 }
 
 // resolveTheme picks the theme to use this run. Priority:

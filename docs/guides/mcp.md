@@ -110,7 +110,7 @@ screen as a reminder to export it.
 ## Troubleshooting
 
 - **"skipping registration: claude not on PATH"** — the harness isn't
-  installed. Install it (it's in the `dev-tools` bundle) and re-run
+  installed. Install it (it's in the `ai-harnesses` bundle) and re-run
   `lfg apply`; only the missing registrations re-execute.
 - **"warning: claude-code registration failed — exit 1"** — a harness
   CLI rejected the add. The literal command lfg ran is in the log

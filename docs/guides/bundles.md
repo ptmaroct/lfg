@@ -12,11 +12,14 @@ how to run it (`brew`, `apt`, `mise`, `npm`, `curl`, `skills`, or
 
 The default preset ships with bundles for a typical dev box:
 
-- **barebones** — git, curl, wget, ripgrep, fd, fzf, eza, bat, btop,
-  starship, and the language runtime managers (mise, node-lts).
-- **dev-tools** — AI coding CLIs (Claude Code, Codex, etc).
+- **barebones** — Homebrew, mise, node-lts, pnpm, bun, yarn, python, uv.
+- **terminal-essentials** — interactive shell quality-of-life: zoxide,
+  ripgrep, lazygit, tailscale, tmux, ghostty, zsh.
+- **ai-harnesses** — AI coding CLIs (Claude Code, Codex, OpenCode, Droid).
 - **skills** — cross-harness AI skills installed via `npx skills add`.
   Gated until `node-lts` is selected.
+- **mcp** — official Model Context Protocol servers for any MCP-aware
+  harness.
 
 You can replace this entirely with a custom preset — see
 [Custom presets](/guides/presets).
