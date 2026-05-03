@@ -78,6 +78,7 @@ func init() {
 	Register(&npmInstaller{})
 	Register(&customInstaller{})
 	Register(&skillsInstaller{})
+	Register(&mcpInstaller{})
 	// brew handles both formulae and casks; "cask" routes through brew.
 	registry["cask"] = registry["brew"]
 	// "curl" is a friendly alias for the custom shell-script runner —

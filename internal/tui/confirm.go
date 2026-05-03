@@ -33,13 +33,15 @@ type confirmModel struct {
 	toInstall []preset.Tool
 	alreadyOK int
 	bySource  map[string]int
+	bundles   []preset.Bundle
+	selected  map[string]bool
 }
 
 func newConfirm(p Palette, bundles []preset.Bundle, selected map[string]bool) confirmModel {
 	// answer=false → Install (Negative slot, right) is focused so users
 	// can hit Enter immediately to install.
 	answer := false
-	m := confirmModel{palette: p, bySource: map[string]int{}, answer: &answer}
+	m := confirmModel{palette: p, bySource: map[string]int{}, answer: &answer, bundles: bundles, selected: selected}
 	for _, b := range bundles {
 		for _, t := range b.Tools {
 			key := b.ID + "/" + t.Name
@@ -76,7 +78,7 @@ func (m confirmModel) Update(msg tea.Msg) (confirmModel, tea.Cmd) {
 		case "esc", "backspace", "delete":
 			return m, goTo(screenTree)
 		case "i", "I":
-			return m, goTo(screenProgress)
+			return m, goTo(nextAfterConfirm(m.bundles, m.selected))
 		case "b", "B":
 			return m, goTo(screenTree)
 		}
@@ -91,7 +93,7 @@ func (m confirmModel) Update(msg tea.Msg) (confirmModel, tea.Cmd) {
 		if m.answer != nil && *m.answer {
 			return m, goTo(screenTree)
 		}
-		return m, goTo(screenProgress)
+		return m, goTo(nextAfterConfirm(m.bundles, m.selected))
 	}
 	return m, cmd
 }
@@ -138,6 +140,17 @@ func (m confirmModel) View(width, height int) string {
 		),
 		height < 22,
 	)
+}
+
+// nextAfterConfirm picks the screen that follows the confirm step:
+// the credentials wizard if any selected MCP needs an env var,
+// otherwise straight to install. Keeping this in one place means the
+// keyboard shortcut and the form-submit path stay in sync.
+func nextAfterConfirm(bundles []preset.Bundle, selected map[string]bool) screen {
+	if len(neededCreds(bundles, selected)) > 0 {
+		return screenCreds
+	}
+	return screenProgress
 }
 
 // statCell — one numeric readout: big colored value + uppercase muted label.

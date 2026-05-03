@@ -16,6 +16,7 @@ const (
 	screenBundles
 	screenTools
 	screenConfirm
+	screenCreds // MCP credentials wizard, between confirm and progress
 	screenProgress
 	screenDone
 	screenBackupPrompt
@@ -44,6 +45,7 @@ type Model struct {
 	bundlePicker bundlePickerModel
 	toolPicker   toolPickerModel
 	confirm      confirmModel
+	creds        credsModel
 	progress     progressModel
 	done         doneModel
 	backup       backupModel
@@ -211,6 +213,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.toolPicker, cmd = m.toolPicker.Update(msg)
 	case screenConfirm:
 		m.confirm, cmd = m.confirm.Update(msg)
+	case screenCreds:
+		m.creds, cmd = m.creds.Update(msg)
 	case screenProgress:
 		m.progress, cmd = m.progress.Update(msg)
 	case screenDone:
@@ -244,6 +248,8 @@ func (m Model) forwardSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		m.toolPicker, cmd = m.toolPicker.Update(msg)
 	case screenConfirm:
 		m.confirm, cmd = m.confirm.Update(msg)
+	case screenCreds:
+		m.creds, cmd = m.creds.Update(msg)
 	case screenProgress:
 		m.progress, cmd = m.progress.Update(msg)
 	case screenDone:
@@ -276,6 +282,8 @@ func (m Model) View() string {
 		return m.toolPicker.View(m.width, m.height)
 	case screenConfirm:
 		return m.confirm.View(m.width, m.height)
+	case screenCreds:
+		return m.creds.View(m.width, m.height)
 	case screenProgress:
 		return m.progress.View(m.width, m.height)
 	case screenDone:
@@ -358,6 +366,9 @@ func (m Model) transition(msg transitionMsg) (tea.Model, tea.Cmd) {
 	case screenConfirm:
 		m.confirm = newConfirm(m.palette, m.bundles, m.selectedTools)
 		return m, m.confirm.Init()
+	case screenCreds:
+		m.creds = newCreds(m.palette, m.bundles, m.selectedTools)
+		return m, m.creds.Init()
 	case screenProgress:
 		runner := m.progressRunner
 		if runner == nil {
@@ -366,7 +377,7 @@ func (m Model) transition(msg transitionMsg) (tea.Model, tea.Cmd) {
 		m.progress = newProgressWithRunner(m.palette, m.bundles, m.selectedTools, runner)
 		return m, m.progress.Init()
 	case screenDone:
-		m.done = newDone(m.palette)
+		m.done = newDone(m.palette, m.bundles, m.selectedTools)
 		return m, m.done.Init()
 	case screenBackupPrompt:
 		m.backup = newBackup(m.palette)
@@ -431,6 +442,9 @@ func (m Model) rehydrate() (tea.Model, tea.Cmd) {
 	case screenConfirm:
 		m.confirm = newConfirm(m.palette, m.bundles, m.selectedTools)
 		return m, m.confirm.Init()
+	case screenCreds:
+		m.creds = newCreds(m.palette, m.bundles, m.selectedTools)
+		return m, m.creds.Init()
 	case screenProgress:
 		runner := m.progressRunner
 		if runner == nil {
@@ -439,7 +453,7 @@ func (m Model) rehydrate() (tea.Model, tea.Cmd) {
 		m.progress = newProgressWithRunner(m.palette, m.bundles, m.selectedTools, runner)
 		return m, m.progress.Init()
 	case screenDone:
-		m.done = newDone(m.palette)
+		m.done = newDone(m.palette, m.bundles, m.selectedTools)
 		return m, m.done.Init()
 	case screenBackupPrompt, screenBackupDone:
 		m.backup = newBackup(m.palette)

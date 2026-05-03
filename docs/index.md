@@ -22,7 +22,7 @@ hero:
 That's it. Pick what you want. `lfg` installs it.
 [Full install guide →](/install)
 
-## How it works
+## How LFG works
 
 <HowItWorks />
 

@@ -11,7 +11,7 @@ package preset
 type Tool struct {
 	Name         string `toml:"name"`
 	Description  string `toml:"description,omitempty"`
-	Source       string `toml:"source"` // brew / cask / apt / mise / npm / curl / custom / skills
+	Source       string `toml:"source"` // brew / cask / apt / mise / npm / curl / custom / skills / mcp
 	Installed    bool   `toml:"-"`      // populated by detect pass; never serialized
 	Version      string `toml:"-"`      // populated by detect pass; never serialized
 	InstallMac   string `toml:"install_mac,omitempty"`
@@ -32,6 +32,47 @@ type Tool struct {
 	// Each line runs through the same exec path as the main install
 	// so output streams into the live log + transcript file.
 	PostInstall []string `toml:"post_install,omitempty"`
+	// MCPType selects the transport for Source="mcp" entries:
+	// "stdio" (default, local process — needs MCPPackage), "http", or
+	// "sse" (both remote — need MCPURL). Empty string is treated as
+	// "stdio" for backward compat.
+	MCPType string `toml:"mcp_type,omitempty"`
+	// MCPPackage is the npm package providing a stdio MCP server
+	// (e.g. "@modelcontextprotocol/server-github"). Installed globally
+	// via `npm install -g <pkg>`. Required for stdio; ignored for
+	// http/sse.
+	MCPPackage string `toml:"mcp_package,omitempty"`
+	// MCPCommand + MCPArgs override the launch command for stdio MCPs
+	// when the published binary name doesn't match the npm package
+	// (default command = `npx -y <MCPPackage>`). Rarely needed.
+	MCPCommand string   `toml:"mcp_command,omitempty"`
+	MCPArgs    []string `toml:"mcp_args,omitempty"`
+	// MCPURL is the endpoint for remote (http / sse) MCP servers.
+	// Required when MCPType is "http" or "sse"; ignored for stdio.
+	MCPURL string `toml:"mcp_url,omitempty"`
+	// MCPHeaders is the optional set of HTTP headers sent with every
+	// request to a remote MCP server (e.g. {"Authorization": "Bearer ..."}).
+	// Values can reference env vars via $VAR — harnesses expand at
+	// connect time.
+	MCPHeaders map[string]string `toml:"mcp_headers,omitempty"`
+	// TargetHarnesses lists the AI-coding-agent configs the MCP server
+	// should be auto-registered with (e.g. ["claude-code", "codex"]).
+	// Empty list = install only, no harness wiring.
+	TargetHarnesses []string `toml:"target_harnesses,omitempty"`
+	// EnvVars names the environment variables the tool needs at runtime
+	// (e.g. ["GITHUB_PERSONAL_ACCESS_TOKEN"]). Surfaced in the info
+	// dialog before install and on the done screen after, so the user
+	// knows exactly what to set. The credentials wizard (between
+	// confirm and progress) prompts password-style inputs for each one;
+	// values land in MCPCredentials for the installer to use, and any
+	// var the user leaves blank is shown on the done screen as a
+	// reminder to set it manually.
+	EnvVars []string `toml:"env_vars,omitempty"`
+	// MCPCredentials maps EnvVar name → user-provided value, populated
+	// at runtime by the credentials wizard. Never serialized — secrets
+	// only live in memory + in the harness configs the installer writes
+	// (which lfg treats as the user's responsibility to protect).
+	MCPCredentials map[string]string `toml:"-"`
 }
 
 // PlannedVersion returns the version string lfg will install for this
@@ -284,6 +325,78 @@ func All() []Bundle {
 					Description: "vercel-labs/portless — local hostnames for dev servers",
 					Homepage:    "https://github.com/vercel-labs/portless",
 					SkillURL:    "https://github.com/vercel-labs/portless",
+				},
+			},
+		},
+		{
+			ID:          "mcp",
+			Name:        "mcp",
+			Description: "Official Model Context Protocol servers — extend any MCP-aware harness",
+			Tools: []Tool{
+				// --- Knowledge & search ---
+				// Up-to-date library docs, fed straight into the model context.
+				{
+					Name: "context7", Source: "mcp", Binary: "context7",
+					Description:     "Up-to-date library docs from context7.com (Upstash)",
+					Homepage:        "https://context7.com",
+					MCPType:         "http",
+					MCPURL:          "https://mcp.context7.com/mcp",
+					MCPHeaders:      map[string]string{"CONTEXT7_API_KEY": "${CONTEXT7_API_KEY}"},
+					EnvVars:         []string{"CONTEXT7_API_KEY"},
+					TargetHarnesses: []string{"all"},
+				},
+				// Perplexity Ask — web search with citations.
+				{
+					Name: "perplexity", Source: "mcp", Binary: "perplexity",
+					Description:     "Perplexity Ask — web search w/ citations (official)",
+					Homepage:        "https://docs.perplexity.ai/guides/mcp-server",
+					MCPType:         "stdio",
+					MCPPackage:      "@perplexity-ai/mcp-server",
+					EnvVars:         []string{"PERPLEXITY_API_KEY"},
+					TargetHarnesses: []string{"all"},
+				},
+				// Exa AI search — code, docs, web.
+				{
+					Name: "exa", Source: "mcp", Binary: "exa",
+					Description:     "Exa AI search — code + docs + web (exa.ai official)",
+					Homepage:        "https://github.com/exa-labs/exa-mcp-server",
+					MCPType:         "stdio",
+					MCPPackage:      "exa-mcp-server",
+					EnvVars:         []string{"EXA_API_KEY"},
+					TargetHarnesses: []string{"all"},
+				},
+
+				// --- Observability & DevOps ---
+				// Sentry: errors, traces, releases. Hosted server uses OAuth on
+				// first connect — no static token to collect.
+				{
+					Name: "sentry", Source: "mcp", Binary: "sentry",
+					Description:     "Sentry errors + traces + releases (OAuth on first use)",
+					Homepage:        "https://mcp.sentry.dev",
+					MCPType:         "http",
+					MCPURL:          "https://mcp.sentry.dev/mcp",
+					TargetHarnesses: []string{"all"},
+				},
+				// CircleCI: builds, workflows, failed-job context.
+				{
+					Name: "circleci", Source: "mcp", Binary: "circleci",
+					Description:     "CircleCI builds + workflows (CircleCI official)",
+					Homepage:        "https://github.com/CircleCI-Public/mcp-server-circleci",
+					MCPType:         "stdio",
+					MCPPackage:      "@circleci/mcp-server-circleci",
+					EnvVars:         []string{"CIRCLECI_TOKEN"},
+					TargetHarnesses: []string{"all"},
+				},
+
+				// --- Productivity ---
+				// Notion: pages, databases, search. Hosted server uses OAuth.
+				{
+					Name: "notion", Source: "mcp", Binary: "notion",
+					Description:     "Notion pages + databases (OAuth on first use)",
+					Homepage:        "https://developers.notion.com/docs/mcp",
+					MCPType:         "http",
+					MCPURL:          "https://mcp.notion.com/mcp",
+					TargetHarnesses: []string{"all"},
 				},
 			},
 		},

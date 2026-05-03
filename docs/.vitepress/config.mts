@@ -261,6 +261,7 @@ export default defineConfig({
         text: "Guides",
         items: [
           { text: "Bundles & tools", link: "/guides/bundles" },
+          { text: "MCP servers", link: "/guides/mcp" },
           { text: "Themes", link: "/guides/themes" },
           { text: "Custom presets", link: "/guides/presets" },
           { text: "Backup & restore", link: "/guides/backup" },
