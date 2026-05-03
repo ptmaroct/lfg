@@ -1,5 +1,5 @@
 # lfg — build, test, snapshot, demo
-.PHONY: build run test snap snap-update widths demo docker docker-bare docker-run docker-shell docker-test docker-test-bare clean release release-snapshot
+.PHONY: build run test snap snap-update widths demo docker docker-bare docker-run docker-shell docker-test docker-test-bare clean release release-snapshot docs-install docs docs-build
 
 build:
 	go build -o lfg ./cmd/lfg
@@ -83,3 +83,14 @@ release:
 clean:
 	rm -f lfg lfg-linux
 	rm -rf snaps demos/*.gif dist
+
+# Docs site (Astro Starlight). Lives in docs/, deploys to GitHub Pages
+# via .github/workflows/docs.yml on push to main.
+docs-install:
+	cd docs && npm install
+
+docs:
+	cd docs && npm run dev
+
+docs-build:
+	cd docs && npm run build

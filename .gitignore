@@ -28,3 +28,8 @@ chrome-tabs.md
 .claude/
 skills-lock.json
 /dist/
+
+# docs site build artifacts
+/docs/node_modules/
+/docs/dist/
+/docs/.astro/

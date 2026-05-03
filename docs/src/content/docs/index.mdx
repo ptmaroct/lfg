@@ -1,0 +1,57 @@
+---
+title: lfg
+description: Open-source TUI bootstrap CLI — make a new dev machine feel like home in minutes.
+template: splash
+hero:
+  tagline: Make a new dev machine feel like home in minutes, not hours.
+  actions:
+    - text: Install
+      link: /lfg/install/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/ptmaroct/lfg
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from "@astrojs/starlight/components";
+
+## What it is
+
+`lfg` is an opinionated, open-source TUI that bootstraps a fresh Mac or
+Linux dev box — it installs the tools you pick, restores your dotfiles,
+and (eventually) distributes your SSH identity to the servers you
+already trust. One `curl | sh` on day one; one command to back up the
+box on day N.
+
+![welcome](/lfg/screens/welcome.png)
+
+<CardGrid>
+  <Card title="Tree picker" icon="seti:folder">
+    Bundles + tools as a collapsible tree. Live versions resolved from
+    npm / brew / nodejs registries.
+  </Card>
+  <Card title="Real installers" icon="rocket">
+    brew · apt · mise · npm · curl · skills. PATH augmented between
+    steps so each step sees what the previous one installed.
+  </Card>
+  <Card title="Backup & restore" icon="seti:lock">
+    `lfg backup` snapshots dotfiles + configs into `tar.gz` or
+    `tar.age` (encrypted with [age](https://github.com/FiloSottile/age)).
+  </Card>
+  <Card title="Themes" icon="sun">
+    Four built-in palettes (lfg / dracula / catppuccin / colorblind).
+    Cycle live with `Ctrl+T`.
+  </Card>
+</CardGrid>
+
+## Why
+
+Setting up a fresh machine eats a full evening: install Homebrew, mise,
+node, bun, go, …; pull dotfiles; copy SSH config; tune a dozen macOS
+preferences; miss two and notice them next Tuesday.
+
+`lfg` wraps the best-in-class primitives — Homebrew, mise, chezmoi, age
+— in a [Charm](https://charm.sh) TUI so the first five minutes on a new
+box feel great.
