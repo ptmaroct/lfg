@@ -4,8 +4,9 @@ import starlight from "@astrojs/starlight";
 import starlightThemeTerminal from "starlight-theme-terminal";
 
 export default defineConfig({
-  site: "https://ptmaroct.github.io",
-  base: "/lfg",
+  // Netlify hosts at the site root (not /lfg/), so no `base` needed.
+  // If we ever move back to GitHub Pages, set `base: "/lfg"` and
+  // `site: "https://ptmaroct.github.io"`.
   integrations: [
     starlight({
       plugins: [starlightThemeTerminal()],
@@ -13,9 +14,9 @@ export default defineConfig({
       description:
         "Open-source TUI bootstrap CLI — make a new dev machine feel like home in minutes.",
       logo: { src: "./src/assets/logo.svg", replacesTitle: false },
-      social: {
-        github: "https://github.com/ptmaroct/lfg",
-      },
+      social: [
+        { icon: "github", label: "GitHub", href: "https://github.com/ptmaroct/lfg" },
+      ],
       editLink: {
         baseUrl: "https://github.com/ptmaroct/lfg/edit/main/docs/",
       },
