@@ -4,7 +4,6 @@ import { onMounted, ref } from "vue";
 defineProps<{
   num: string;
   title: string;
-  subtitle?: string;
 }>();
 
 const root = ref<HTMLElement | null>(null);
@@ -37,14 +36,9 @@ onMounted(() => {
     ref="root"
     class="hiw-step"
     :aria-labelledby="`step-${num}-title`"
-    :style="{ transitionDelay: `${(parseInt(num) - 1) * 80}ms` }"
+    :style="{ transitionDelay: `${(parseInt(num) - 1) * 60}ms` }"
   >
-    <div class="hiw-step__eyebrow" aria-hidden="true">
-      <span class="hiw-step__num">{{ num }}</span>
-      <span class="hiw-step__rule" />
-    </div>
     <h3 :id="`step-${num}-title`" class="hiw-step__title">{{ title }}</h3>
-    <p v-if="subtitle" class="hiw-step__sub">{{ subtitle }}</p>
     <div class="hiw-step__body">
       <slot />
     </div>
