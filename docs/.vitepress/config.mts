@@ -1,5 +1,114 @@
 import { defineConfig } from "vitepress";
 
+const HERO_CSS = `
+:root {
+  --vp-c-brand-1: #a78bfa;
+  --vp-c-brand-2: #c4b5fd;
+  --vp-c-brand-3: #a78bfa;
+  --vp-c-brand-soft: rgba(167, 139, 250, 0.16);
+
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(120deg, #f472b6 0%, #a78bfa 50%, #34d399 100%);
+
+  --vp-home-hero-image-background-image: linear-gradient(120deg, rgba(244,114,182,0.45), rgba(52,211,153,0.45));
+  --vp-home-hero-image-filter: blur(80px);
+}
+
+.dark {
+  --vp-c-brand-1: #c4b5fd;
+  --vp-c-brand-2: #a78bfa;
+  --vp-c-brand-3: #c4b5fd;
+}
+
+/* Hero typography — terminal-bold gradient on the headline (text), mono tagline */
+.VPHero .text {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+  background: linear-gradient(120deg, #f472b6 0%, #a78bfa 50%, #34d399 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-size: clamp(2rem, 6.5vw, 3.5rem);
+  max-width: 16ch;
+}
+.VPHero .tagline {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 400;
+  font-size: 0.95rem;
+  letter-spacing: 0;
+  line-height: 1.55;
+  color: var(--vp-c-text-2);
+  max-width: 38em;
+}
+
+/* Feature cards — mono titles, tighter look */
+.VPFeature .title {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-size: 1.02rem;
+}
+.VPFeature .details {
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+/* Body sections under the home hero — gradient bar above each H2 */
+.VPHome > .vp-doc h2,
+.VPHome .container .vp-doc h2 {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  border-top: none;
+  padding-top: 2.75rem;
+  margin-top: 3rem;
+  position: relative;
+}
+.VPHome > .vp-doc h2::before,
+.VPHome .container .vp-doc h2::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 2.5rem;
+  height: 2px;
+  background: linear-gradient(90deg, #f472b6, #a78bfa, #34d399);
+  border-radius: 2px;
+}
+
+/* Constrain + center the home body markdown */
+.VPHome > .vp-doc,
+.VPHome .container .vp-doc {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 24px 4rem;
+}
+.VPHome img[src*='/screens/'] {
+  border-radius: 10px;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 24px 60px -20px rgba(167,139,250,0.25);
+  margin-top: 1.25rem;
+}
+
+/* Nav title — logo IS the wordmark, so trim the gap */
+.VPNavBar .VPNavBarTitle .title { gap: 0.5rem; }
+
+/* Footer — mono, brand link color */
+.VPFooter .message,
+.VPFooter .copyright {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.82rem;
+  letter-spacing: 0;
+}
+.VPFooter a {
+  color: var(--vp-c-brand-1);
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+}
+.VPFooter a:hover { opacity: 0.7; }
+`;
+
 export default defineConfig({
   title: "lfg",
   description:
@@ -8,10 +117,19 @@ export default defineConfig({
   lastUpdated: true,
   head: [
     ["link", { rel: "icon", type: "image/svg+xml", href: "/logo.svg" }],
+    ["link", { rel: "preconnect", href: "https://fonts.googleapis.com" }],
+    ["link", { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: "" }],
+    [
+      "link",
+      {
+        href: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&display=swap",
+        rel: "stylesheet",
+      },
+    ],
+    ["style", {}, HERO_CSS],
   ],
   themeConfig: {
     logo: "/logo.svg",
-    siteTitle: "lfg",
     nav: [
       { text: "Install", link: "/install" },
       { text: "Quick start", link: "/quick-start" },
@@ -68,6 +186,7 @@ export default defineConfig({
     ],
     socialLinks: [
       { icon: "github", link: "https://github.com/ptmaroct/lfg" },
+      { icon: "x", link: "https://x.com/waahbete" },
     ],
     editLink: {
       pattern: "https://github.com/ptmaroct/lfg/edit/main/docs/:path",
@@ -77,8 +196,9 @@ export default defineConfig({
       provider: "local",
     },
     footer: {
-      message: "Released under the MIT License.",
-      copyright: "© ptmaroct",
+      message:
+        'Built by <a href="https://anujsh.com" target="_blank" rel="noopener">Anuj Sharma</a> · <a href="https://x.com/waahbete" target="_blank" rel="noopener">@waahbete</a>',
+      copyright: "Released under the MIT License.",
     },
   },
 });
