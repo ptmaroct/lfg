@@ -67,9 +67,23 @@ changelog:
       - "Merge pull request"
       - "Merge branch"
 
-# Homebrew tap is deferred — install.sh covers macOS + Linux from
-# a single curl one-liner. Re-enable when the tap repo lands at
-# github.com/ptmaroct/homebrew-tap (see docs/release.md if/when added).
+brews:
+  - name: lfg
+    repository:
+      owner: ptmaroct
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    homepage: https://github.com/ptmaroct/lfg
+    description: TUI bootstrap CLI for new dev machines
+    license: MIT
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    test: |
+      system "#{bin}/lfg", "version"
+    install: |
+      bin.install "lfg"
 
 release:
   github:

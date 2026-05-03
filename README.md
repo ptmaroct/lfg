@@ -12,6 +12,14 @@ distributes your SSH identity to the servers you trust.
 
 ## Install
 
+Homebrew (macOS + Linux):
+
+```sh
+brew install ptmaroct/tap/lfg
+```
+
+Or via the curl one-liner:
+
 ```sh
 curl -fsSL https://raw.githubusercontent.com/ptmaroct/lfg/main/install.sh | sh
 ```
