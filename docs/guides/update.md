@@ -21,6 +21,20 @@ lfg update --version=v0.3.0
 Useful for downgrading after a regression, or pinning a fleet to a
 known-good release.
 
+## Beta channel
+
+Beta releases ship from `develop` ahead of stable. Two ways to track
+them:
+
+```sh
+brew install ptmaroct/tap/lfg-beta     # parallel install, separate binary
+lfg update --version=v0.4.0-beta.1     # one-off pin, replaces running binary
+```
+
+`lfg update` (no flag) only follows the **latest stable** release —
+beta tags never get auto-pulled. Use the tap formula if you want
+betas to update transparently with `brew upgrade`.
+
 ## How it works
 
 1. Hits `api.github.com/repos/ptmaroct/lfg/releases/latest` (or the

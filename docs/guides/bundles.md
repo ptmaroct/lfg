@@ -14,7 +14,9 @@ The default preset ships with bundles for a typical dev box:
 
 - **barebones** — Homebrew, mise, node-lts, pnpm, bun, yarn, python, uv.
 - **terminal-essentials** — interactive shell quality-of-life: zoxide,
-  ripgrep, lazygit, tailscale, tmux, ghostty, zsh.
+  ripgrep, lazygit, tailscale, tmux, plus `ghostty` (macOS only, brew
+  cask) and `zsh` (Linux only, since recent macOS already ships a
+  current zsh).
 - **ai-harnesses** — AI coding CLIs (Claude Code, Codex, OpenCode, Droid).
 - **skills** — cross-harness AI skills installed via `npx skills add`.
   Gated until `node-lts` is selected.

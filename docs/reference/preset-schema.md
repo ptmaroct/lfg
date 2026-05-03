@@ -49,6 +49,8 @@ requires = ["node-lts"]   # optional, gate bundle until tool is selected
 | `install_mac` | string | one of | install command on macOS |
 | `install_linux` | string | one of | install command on Linux |
 | `mandatory` | bool | no | always-on, can't be unchecked |
+| `skip_mac` | bool | no | hide this tool on macOS (host filter applied before render) |
+| `skip_linux` | bool | no | hide this tool on Linux (host filter applied before render) |
 | `post_install` | `[]string` | no | shell commands chained after main install |
 | `skill_url` | string | yes if `source=skills` | URL passed to `npx skills add` |
 | `mcp_type` | string | no | `stdio` (default), `http`, or `sse` |
@@ -63,6 +65,13 @@ requires = ["node-lts"]   # optional, gate bundle until tool is selected
 At least one of `install_mac` / `install_linux` is required.
 `post_install` failures surface as warnings — the main install still
 counts as success.
+
+Use `skip_mac` / `skip_linux` when a tool only makes sense on one
+platform. Built-in `terminal-essentials` uses both: `ghostty` ships
+only via macOS cask, and the brew `zsh` override is Linux-only since
+recent macOS already ships a current zsh. Filtered tools never appear
+in the picker, so users on the other OS don't see a placeholder they
+can't act on.
 
 ## Source backends
 

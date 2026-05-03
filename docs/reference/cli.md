@@ -30,7 +30,8 @@ These work on every command:
 | Flag | Default | Description |
 |---|---|---|
 | `--theme <name>` | `lfg` | Palette: `lfg`, `dracula`, `catppuccin`, `colorblind`. |
-| `--config <path>` | built-in | Custom preset TOML (file path or `http(s)://` URL). |
+| `--config <path>`, `-c` | built-in | Custom preset TOML (file path or `http(s)://` URL). |
+| `--bg <mode>` | `auto` | Force terminal background: `auto`, `dark`, `light`. Also reads `LFG_BG`. |
 | `--debug` | off | Verbose log → `~/.config/lfg/logs/debug-<ts>.log`. |
 | `--dry-run`, `-n` | off | Walk the flow without exec'ing anything. |
 | `--help`, `-h` | — | Show help for the command. |
