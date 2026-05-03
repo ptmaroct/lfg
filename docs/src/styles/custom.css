@@ -1,0 +1,6 @@
+/* Site-specific overrides on top of starlight-theme-terminal. Keep this
+   light — the theme already sets the green-on-black terminal aesthetic. */
+.site-title {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
