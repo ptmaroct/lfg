@@ -12,6 +12,12 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v0.4.0). Must already exist."
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -23,6 +29,7 @@ jobs:
       - name: checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
           fetch-depth: 0
 
       - name: set up go
