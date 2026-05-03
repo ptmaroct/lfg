@@ -1,7 +1,7 @@
 // @ts-check
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
-import starlightThemeBlack from "starlight-theme-black";
+import starlightThemeSix from "@six-tech/starlight-theme-six";
 
 export default defineConfig({
   // Netlify hosts at the site root (not /lfg/), so no `base` needed.
@@ -9,11 +9,7 @@ export default defineConfig({
   // `site: "https://ptmaroct.github.io"`.
   integrations: [
     starlight({
-      plugins: [
-        starlightThemeBlack({
-          navLinks: [{ label: "Docs", link: "/introduction" }],
-        }),
-      ],
+      plugins: [starlightThemeSix({})],
       title: "lfg",
       description:
         "Open-source TUI bootstrap CLI — make a new dev machine feel like home in minutes.",
