@@ -19,9 +19,9 @@ The default preset ships with bundles for a typical dev box:
   Gated until `node-lts` is selected.
 
 You can replace this entirely with a custom preset — see
-[Custom presets](/lfg/guides/presets/).
+[Custom presets](/guides/presets/).
 
-![tree](/lfg/screens/tree.png)
+![tree](/screens/tree.png)
 
 ## Tree picker behaviour
 
@@ -39,7 +39,7 @@ install command and updates in place once the registry responds.
 
 ## Tool info card
 
-![info](/lfg/screens/info.png)
+![info](/screens/info.png)
 
 
 Press `i` on any tool to open a card showing:

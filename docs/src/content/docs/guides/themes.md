@@ -9,7 +9,7 @@ every screen, and your choice persists in `~/.config/lfg/state.json`.
 
 | LFG (default) | Dracula | Catppuccin |
 |---|---|---|
-| ![lfg](/lfg/screens/welcome.png) | ![dracula](/lfg/screens/welcome-dracula.png) | ![catppuccin](/lfg/screens/welcome-catppuccin.png) |
+| ![lfg](/screens/welcome.png) | ![dracula](/screens/welcome-dracula.png) | ![catppuccin](/screens/welcome-catppuccin.png) |
 
 ## Built-in palettes
 
