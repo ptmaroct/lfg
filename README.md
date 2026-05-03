@@ -6,7 +6,7 @@
 box — installs the tools you pick, restores your dotfiles, and (soon)
 distributes your SSH identity to the servers you trust.
 
-📖 **Full docs:** <https://lfg-docs.netlify.app>
+📖 **Full docs:** [lfg-docs.netlify.app](https://lfg-docs.netlify.app)
 
 ![welcome](assets/welcome.png)
 
