@@ -6,7 +6,7 @@
 box — installs the tools you pick, restores your dotfiles, and (soon)
 distributes your SSH identity to the servers you trust.
 
-📖 **Full docs:** <https://lfg.netlify.app>
+📖 **Full docs:** <https://lfg-docs.netlify.app>
 
 ![welcome](assets/welcome.png)
 
@@ -56,7 +56,7 @@ resolver, `lfg backup`, `lfg doctor`, `lfg update`, four themes.
 
 Go 1.25+ • bubbletea/bubbles/huh/lipgloss • cobra • TOML preset •
 age-encrypted backups • goreleaser releases. Full breakdown:
-[docs/internals/architecture](https://lfg.netlify.app/internals/architecture/).
+[docs/internals/architecture](https://lfg-docs.netlify.app/internals/architecture/).
 
 ## Develop
 
@@ -68,13 +68,13 @@ make docker-test     # one-shot: build + auto-run lfg --debug + bash on exit
 make docs            # local docs site (http://localhost:4321/)
 ```
 
-See [docs/project/contributing](https://lfg.netlify.app/project/contributing/)
+See [docs/project/contributing](https://lfg-docs.netlify.app/project/contributing/)
 for the full list and house rules.
 
 ## Contributing
 
 Open an issue before a PR so we can align on scope. Roadmap:
-[docs/project/roadmap](https://lfg.netlify.app/project/roadmap/).
+[docs/project/roadmap](https://lfg-docs.netlify.app/project/roadmap/).
 
 ## License
 
