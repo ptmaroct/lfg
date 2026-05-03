@@ -121,19 +121,39 @@ func applyBg() {
 	lipgloss.SetHasDarkBackground(dark)
 }
 
-// loadPreset returns the bundle slice for this run. Honors --config when
-// set, otherwise falls back to the built-in preset.All(). Errors here
-// are fatal — the user explicitly asked to load a config and we don't
-// want to silently fall back to defaults under their nose.
-func loadPreset() ([]preset.Bundle, error) {
+// loadPreset returns the bundles + aliases for this run. Honors
+// --config when set, otherwise falls back to the built-in
+// preset.All() / preset.DefaultAliasesFlat(). Errors here are fatal —
+// the user explicitly asked to load a config and we don't want to
+// silently fall back to defaults under their nose.
+//
+// REPLACE semantics: when --config provides [[bundles]] those replace
+// the built-ins entirely; same for [[aliases]] (an absent table means
+// "no aliases offered" — opted-out by omission).
+func loadPreset() (preset.Loaded, error) {
 	if configFlag == "" {
-		return preset.FilterForHost(preset.All()), nil
+		return preset.Loaded{
+			Bundles: preset.FilterForHost(preset.All()),
+			Aliases: preset.FilterAliasesForHost(preset.DefaultAliasesFlat()),
+		}, nil
 	}
-	bundles, err := preset.Load(configFlag)
+	loaded, err := preset.Load(configFlag)
 	if err != nil {
-		return nil, fmt.Errorf("load preset %q: %w", configFlag, err)
+		return preset.Loaded{}, fmt.Errorf("load preset %q: %w", configFlag, err)
 	}
-	return preset.FilterForHost(bundles), nil
+	loaded.Bundles = preset.FilterForHost(loaded.Bundles)
+	loaded.Aliases = preset.FilterAliasesForHost(loaded.Aliases)
+	return loaded, nil
+}
+
+// loadBundles is a convenience used by subcommands that don't care
+// about aliases (lfg apply / lfg backup don't touch the alias picker).
+func loadBundles() ([]preset.Bundle, error) {
+	loaded, err := loadPreset()
+	if err != nil {
+		return nil, err
+	}
+	return loaded.Bundles, nil
 }
 
 // resolveTheme picks the theme to use this run. Priority:

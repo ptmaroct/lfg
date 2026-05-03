@@ -258,7 +258,7 @@ func (m progressModel) Update(msg tea.Msg) (progressModel, tea.Cmd) {
 		return m, tea.Batch(
 			m.stopwatch.Stop(),
 			tea.Tick(800*time.Millisecond, func(time.Time) tea.Msg {
-				return transitionMsg{target: screenDone}
+				return transitionMsg{target: screenAliases}
 			}),
 		)
 	case progress.FrameMsg:
@@ -269,7 +269,7 @@ func (m progressModel) Update(msg tea.Msg) (progressModel, tea.Cmd) {
 		if m.awaitAck {
 			switch msg.String() {
 			case "enter", " ":
-				return m, goTo(screenDone)
+				return m, goTo(screenAliases)
 			case "esc":
 				return m, goTo(screenConfirm)
 			}

@@ -194,6 +194,72 @@ func TestSnapshot_Probe(t *testing.T) {
 	}
 }
 
-// (TestNoControlCharsLeak removed — was a fragile heuristic for an old
-// huh-group-border bug. The redesign uses `│` legitimately as a separator
-// in header strips. Snapshot tests above already catch any visual drift.)
+// TestSnapshot_Aliases covers the alias picker — final optional screen
+// before the done card. Bypasses driveAndSnapshot because reaching the
+// alias screen via real key input would require driving the whole
+// install flow (slow, brittle): we construct aliasesModel directly with
+// the default catalog, then render.
+func TestSnapshot_Aliases(t *testing.T) {
+	for _, sz := range sizes {
+		name := "aliases_lfg_" + sz.name
+		t.Run(name, func(t *testing.T) {
+			pal := PaletteFor(ThemeLFG)
+			m := newAliases(pal, preset.DefaultAliases(), nil, nil)
+			pumpAliasesInit(&m)
+			renderGolden(t, name, m.View(sz.w, sz.h))
+		})
+	}
+}
+
+// TestSnapshot_AliasesConflict locks in the rendering of the conflict
+// warning suffix on alias options whose names already exist in the
+// user's rc files outside the lfg-managed block.
+func TestSnapshot_AliasesConflict(t *testing.T) {
+	sz := termSize{"md_100x30", 100, 30}
+	name := "aliases_conflict_lfg_" + sz.name
+	t.Run(name, func(t *testing.T) {
+		pal := PaletteFor(ThemeLFG)
+		conflicts := map[string]string{
+			"gd": ".zshrc:42",
+			"gs": ".bashrc:17",
+		}
+		m := newAliases(pal, preset.DefaultAliases(), nil, conflicts)
+		pumpAliasesInit(&m)
+		renderGolden(t, name, m.View(sz.w, sz.h))
+	})
+}
+
+// pumpAliasesInit fires the form's Init() command so huh's MultiSelect
+// transitions out of its uninitialized "blank canvas" state and the
+// option list actually renders for the snapshot. Without this every
+// golden contains an empty form area.
+func pumpAliasesInit(m *aliasesModel) {
+	if cmd := m.Init(); cmd != nil {
+		if msg := cmd(); msg != nil {
+			updated, _ := m.Update(msg)
+			*m = updated
+		}
+	}
+}
+
+func renderGolden(t *testing.T, name, got string) {
+	t.Helper()
+	goldenPath := filepath.Join("testdata", name+".golden")
+	if *updateGolden {
+		if err := os.MkdirAll("testdata", 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(goldenPath, []byte(got), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("wrote %s (%d lines)", goldenPath, strings.Count(got, "\n"))
+		return
+	}
+	want, err := os.ReadFile(goldenPath)
+	if err != nil {
+		t.Fatalf("missing golden %s — run `go test ./internal/tui -update` first: %v", goldenPath, err)
+	}
+	if got != string(want) {
+		t.Errorf("snapshot diff for %s\n--- want\n%s\n--- got\n%s", name, want, got)
+	}
+}

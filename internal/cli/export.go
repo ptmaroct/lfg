@@ -31,7 +31,7 @@ func init() {
 }
 
 func runExport(cmd *cobra.Command, args []string) error {
-	bundles, err := loadPreset()
+	loaded, err := loadPreset()
 	if err != nil {
 		return err
 	}
@@ -47,11 +47,12 @@ func runExport(cmd *cobra.Command, args []string) error {
 	}
 
 	if dryRun {
-		fmt.Printf("(dry-run) would write %s with %d bundles\n", out, len(bundles))
+		fmt.Printf("(dry-run) would write %s with %d bundles, %d aliases\n",
+			out, len(loaded.Bundles), len(loaded.Aliases))
 		return nil
 	}
 
-	if err := preset.Save(out, bundles); err != nil {
+	if err := preset.Save(out, loaded.Bundles, loaded.Aliases); err != nil {
 		return err
 	}
 	fmt.Printf("✓ saved preset to %s\n", out)
