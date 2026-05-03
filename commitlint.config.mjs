@@ -8,7 +8,7 @@
 // See:
 //   https://www.conventionalcommits.org/
 //   https://github.com/googleapis/release-please?tab=readme-ov-file#how-should-i-write-my-commits
-module.exports = {
+export default {
   extends: ["@commitlint/config-conventional"],
   rules: {
     "type-enum": [

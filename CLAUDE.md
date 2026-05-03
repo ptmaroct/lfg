@@ -319,7 +319,7 @@ Subject must:
 - **not end with a period**
 - describe the change in the imperative ("add", not "added"/"adds")
 
-**Allowed types** (mirrors `commitlint.config.js`):
+**Allowed types** (mirrors `commitlint.config.mjs`):
 `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `build`, `ci`,
 `chore`, `style`, `revert`, `release`.
 
