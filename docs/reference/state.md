@@ -21,7 +21,7 @@ description: What lfg writes under ~/.config/lfg/ and what each file is for.
 {
   "theme": "dracula",
   "version": "v0.3.0",
-  "lastBundles": ["barebones", "dev-tools"]
+  "lastBundles": ["barebones", "ai-harnesses"]
 }
 ```
 

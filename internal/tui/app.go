@@ -81,7 +81,7 @@ func WithProgressRunner(r ProgressRunner) Option {
 // Real CLI startup uses NewWithBundles after running detect so the
 // picker reflects what's actually installed.
 func New(theme ThemeName) Model {
-	return NewWithBundles(theme, preset.All())
+	return NewWithBundles(theme, preset.FilterForHost(preset.All()))
 }
 
 // NewWithBundles is the explicit constructor used after a detect pass.

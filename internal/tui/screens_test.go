@@ -24,7 +24,7 @@ import (
 // presetAllForTest returns the same hardcoded bundle data the TUI uses
 // in tests (preset.All). Hoisted to its own function so multiple tests
 // can share it without recreating the import dance.
-func presetAllForTest() []preset.Bundle { return preset.All() }
+func presetAllForTest() []preset.Bundle { return preset.FilterForHost(preset.All()) }
 
 var updateGolden = flag.Bool("update", false, "update golden files")
 

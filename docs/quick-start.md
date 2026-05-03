@@ -39,7 +39,8 @@ result with key-backup reminder. Press `q` for quit-confirm,
 If you already know which bundles you want, skip the TUI:
 
 ```sh
-lfg apply barebones dev-tools     # multiple bundles, no prompts
+lfg apply barebones ai-harnesses  # multiple bundles, no prompts
+lfg apply terminal-essentials     # zoxide, ripgrep, tmux, …
 lfg apply -n barebones            # print what it would run
 ```
 
