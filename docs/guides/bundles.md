@@ -19,7 +19,7 @@ The default preset ships with bundles for a typical dev box:
   Gated until `node-lts` is selected.
 
 You can replace this entirely with a custom preset — see
-[Custom presets](/guides/presets/).
+[Custom presets](/guides/presets).
 
 ![tree](/screens/tree.png)
 

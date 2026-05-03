@@ -38,7 +38,8 @@ you ask it to.
 `lfg update` exits non-zero on any failure (network, checksum
 mismatch, atomic-rename failure). Safe in cron:
 
-```cron
+```sh
+# crontab entry — weekly Mon 04:00
 0 4 * * 1 /usr/local/bin/lfg update >/var/log/lfg-update.log 2>&1
 ```
 

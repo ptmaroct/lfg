@@ -41,7 +41,7 @@ lfg --config ./preset.toml   # load it (bundles, mandatories, install commands a
 
 ## Field reference
 
-See [Preset TOML schema](/reference/preset-schema/) for the full
+See [Preset TOML schema](/reference/preset-schema) for the full
 field-by-field reference (post-install hooks, skills URLs, source
 backends, etc).
 
