@@ -27,5 +27,5 @@ jobs:
           config-file: release-please-config-beta.json
           manifest-file: .release-please-manifest-beta.json
           target-branch: develop
-          # See release-please.yml — goreleaser owns release creation.
-          skip-github-release: true
+          # See release-please.yml — release-please tags + creates the
+          # GitHub Release body, goreleaser appends artifacts.

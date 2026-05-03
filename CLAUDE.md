@@ -381,13 +381,16 @@ its own `manifest` file (`.release-please-manifest.json` vs
 last-released version per channel independently. Sharing one manifest
 would make beta increments overwrite stable's last-released marker.
 
-**release-please vs goreleaser ownership.** Both workflows set
-`skip-github-release: true` on the release-please-action input. That's
-deliberate — without it, release-please creates a draft GitHub Release
-the moment it tags, then goreleaser tries to create another release
-with the same tag and fails (`release already exists`). With
-skip-github-release, release-please owns the PR + CHANGELOG.md + tag;
-goreleaser owns the GitHub Release + artifacts + tap formula push.
+**release-please vs goreleaser ownership.** release-please owns the
+PR + CHANGELOG.md + tag + GitHub Release body. goreleaser owns the
+binary artifacts + Homebrew tap formula push. The handshake is
+goreleaser's `release.mode: append` in `.goreleaser.yaml` — when the
+tag-push workflow fires, the GitHub Release already exists (created
+by release-please during tagging) and goreleaser uploads tarballs +
+checksums to that existing release without overwriting its body. Do
+NOT set `skip-github-release: true` on the release-please-action
+input: in v4+ that flag skips tagging entirely (despite the name),
+leaving merged release PRs in `autorelease: pending` forever.
 
 **Goreleaser two-formula split.** `.goreleaser.yaml` has two `brews:`
 entries pointing at the same tap repo. The `lfg` entry uses
@@ -450,9 +453,11 @@ they ever do, both formula entries need migrating.
   binaries were briefly public. New goreleaser run produces new
   BuildDate-baked tarballs with different SHA256s; anyone who pulled
   the first set is broken. Always bump to the next patch instead.
-- Letting both release-please and goreleaser create the GitHub Release.
-  Set `skip-github-release: true` on the release-please-action input;
-  goreleaser is the sole release publisher.
+- Setting `skip-github-release: true` on release-please-action.
+  Despite the name, in v4+ it skips tagging too, so merged release
+  PRs sit in `autorelease: pending` forever. Use goreleaser's
+  `release.mode: append` instead so it appends artifacts to the
+  release-please-created GitHub Release.
 - Forwarding raw subprocess stdout to the TUI log tail without
   stripping ANSI escapes — fancy installers (npx skills add) emit
   cursor-move sequences that scramble the frame.
