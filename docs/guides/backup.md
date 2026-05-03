@@ -53,5 +53,4 @@ back to their original home-relative paths and refuses to clobber
 existing files unless you pass `--force`.
 
 For an `.age` archive, `lfg backup --restore` will look for the key
-at `~/.config/lfg/key.txt` automatically. Override with `--key
-<path>` if you stashed it elsewhere.
+at `~/.config/lfg/key.txt` automatically. Override with `--key <path>` if you stashed it elsewhere.

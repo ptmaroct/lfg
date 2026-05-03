@@ -52,7 +52,7 @@ lfg update
 
 Pulls the latest release from GitHub via
 [minio/selfupdate](https://github.com/minio/selfupdate). See the
-[self-update guide](/guides/update/) for details.
+[self-update guide](/guides/update) for details.
 
 ## Verify
 

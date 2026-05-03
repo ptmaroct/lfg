@@ -84,8 +84,8 @@ clean:
 	rm -f lfg lfg-linux
 	rm -rf snaps demos/*.gif dist
 
-# Docs site (Astro Starlight). Lives in docs/, deploys to GitHub Pages
-# via .github/workflows/docs.yml on push to main.
+# Docs site (VitePress). Lives in docs/, deploys to Netlify on push
+# to main (build dir: docs/.vitepress/dist).
 docs-install:
 	cd docs && npm install
 
