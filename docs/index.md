@@ -17,10 +17,7 @@ hero:
 
 ## Get started
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/ptmaroct/lfg/main/install.sh | sh
-lfg
-```
+<InstallTabs />
 
 That's it. Pick what you want. `lfg` installs it.
 [Full install guide →](/install)

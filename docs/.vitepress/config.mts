@@ -123,6 +123,20 @@ export default defineConfig({
   lastUpdated: true,
   sitemap: { hostname: SITE_URL },
   head: [
+    // Viewport — disables pinch zoom across mobile browsers. iOS Safari
+    // ignores `user-scalable=no` since iOS 10, but combining
+    // `maximum-scale=1` with `touch-action: manipulation` (in style.css)
+    // gets the same effect on Safari while remaining a no-op on
+    // Chrome/Firefox where user-scalable=no still works.
+    [
+      "meta",
+      {
+        name: "viewport",
+        content:
+          "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
+      },
+    ],
+
     // Favicons
     ["link", { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" }],
     ["link", { rel: "alternate icon", href: "/favicon.svg" }],
@@ -170,6 +184,38 @@ export default defineConfig({
       },
     ],
     ["style", {}, HERO_CSS],
+
+    // JSON-LD — SoftwareApplication structured data so search engines
+    // and link unfurlers (slack/discord) understand what lfg is.
+    [
+      "script",
+      { type: "application/ld+json" },
+      JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        name: SITE_NAME,
+        alternateName: "lfg",
+        description: SITE_DESCRIPTION,
+        url: SITE_URL,
+        downloadUrl: "https://github.com/ptmaroct/lfg/releases/latest",
+        applicationCategory: "DeveloperApplication",
+        applicationSubCategory: "CLI",
+        operatingSystem: "macOS, Linux",
+        license: "https://github.com/ptmaroct/lfg/blob/main/LICENSE",
+        author: {
+          "@type": "Person",
+          name: "Anuj Sharma",
+          url: "https://anujsh.com",
+        },
+        codeRepository: "https://github.com/ptmaroct/lfg",
+        programmingLanguage: "Go",
+        offers: {
+          "@type": "Offer",
+          price: "0",
+          priceCurrency: "USD",
+        },
+      }),
+    ],
   ],
 
   // Per-page canonical + og:title/description overrides.
