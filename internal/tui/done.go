@@ -8,14 +8,22 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/ptmaroct/lfg/internal/preset"
 )
 
-// doneModel — final celebration card. Big checkmark, headline, next-step list.
+// doneModel — final celebration card. Big checkmark, headline,
+// next-step list, and (when the install included MCP servers needing
+// secrets) a "set these env vars" section with copy-paste export lines.
 type doneModel struct {
-	palette Palette
+	palette  Palette
+	bundles  []preset.Bundle
+	selected map[string]bool
 }
 
-func newDone(p Palette) doneModel { return doneModel{palette: p} }
+func newDone(p Palette, bundles []preset.Bundle, selected map[string]bool) doneModel {
+	return doneModel{palette: p, bundles: bundles, selected: selected}
+}
 
 func (m doneModel) Init() tea.Cmd { return nil }
 
@@ -62,6 +70,21 @@ func (m doneModel) View(width, height int) string {
 	}
 	b.WriteString("\n")
 
+	// Env vars section — listed when any installed tool declares EnvVars
+	// (typically MCP servers needing GITHUB_PERSONAL_ACCESS_TOKEN etc).
+	// Renders one `export FOO=...` line per var so the user can paste
+	// straight into their shell rc. We never collect or write the values
+	// — just remind the user what to set.
+	if envs := requiredEnvVars(m.bundles, m.selected); len(envs) > 0 {
+		b.WriteString(SectionLabel(p, "Env vars to set", "before MCP servers can run", contentW))
+		b.WriteString("\n\n")
+		boxStyle := lipgloss.NewStyle().Foreground(p.Text).Background(p.Panel).Padding(0, 1)
+		for _, ev := range envs {
+			b.WriteString("  " + boxStyle.Render("export "+ev+"=...") + "\n")
+		}
+		b.WriteString("\n")
+	}
+
 	// Star CTA + attribution. Centered so it reads as a sign-off.
 	star := lipgloss.NewStyle().Foreground(p.Warn).Bold(true).Render("★")
 	starMsg := lipgloss.NewStyle().Foreground(p.Text).Render("If lfg helped, star us on GitHub")
@@ -83,6 +106,31 @@ func (m doneModel) View(width, height int) string {
 		HintLine(p, KeyHint(p, "any", "exit")),
 		height < 22,
 	)
+}
+
+// requiredEnvVars walks the install plan (bundles × selected map) and
+// returns a deduped, stable-ordered list of env vars the installed
+// tools declared. Used by the done screen to surface MCP secrets the
+// user must set before the servers will function.
+func requiredEnvVars(bundles []preset.Bundle, selected map[string]bool) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, b := range bundles {
+		for _, t := range b.Tools {
+			key := b.ID + "/" + t.Name
+			if !selected[key] {
+				continue
+			}
+			for _, ev := range t.EnvVars {
+				if seen[ev] {
+					continue
+				}
+				seen[ev] = true
+				out = append(out, ev)
+			}
+		}
+	}
+	return out
 }
 
 // reloadShellCmd returns the literal command the user should run to

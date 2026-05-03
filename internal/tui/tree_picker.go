@@ -134,9 +134,9 @@ func (m *treePickerModel) rebuildRows() {
 		if !m.expanded[b.ID] {
 			continue
 		}
-		// Skills section is gated on node — surface why before listing
-		// tools so users understand the disabled state.
-		if b.ID == "skills" && !nodeOK {
+		// Skills + MCP sections are gated on node — surface why before
+		// listing tools so users understand the disabled state.
+		if (b.ID == "skills" || b.ID == "mcp") && !nodeOK {
 			m.rows = append(m.rows, treeRow{
 				kind: "subheader", bundleID: b.ID,
 				label: "REQUIRES node-lts — select it in barebones first",
@@ -246,10 +246,11 @@ func (m *treePickerModel) toggleAtCursor() {
 	if row.kind == "subheader" {
 		return
 	}
-	// Skills bundle requires node-lts. Block toggling until node is
-	// either already installed or queued in the install set; otherwise
-	// `npx skills add` won't have a runtime to execute.
-	if row.bundleID == "skills" && !m.nodeAvailable() {
+	// Skills + MCP bundles require node-lts. Block toggling until node
+	// is either already installed or queued in the install set;
+	// otherwise `npx skills add` / `npm install -g <mcp-pkg>` won't
+	// have a runtime to execute.
+	if (row.bundleID == "skills" || row.bundleID == "mcp") && !m.nodeAvailable() {
 		return
 	}
 	if row.kind == "tool" {

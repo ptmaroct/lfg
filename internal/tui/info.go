@@ -92,8 +92,36 @@ func (m infoModel) View(width, height int) string {
 	if m.tool.SkillURL != "" {
 		b.WriteString(linkRow("skill repo", m.tool.SkillURL))
 	}
+	if m.tool.MCPPackage != "" {
+		b.WriteString(row("npm package", m.tool.MCPPackage))
+	}
+	if m.tool.MCPURL != "" {
+		b.WriteString(row("mcp url", m.tool.MCPURL))
+	}
+	if m.tool.MCPType != "" {
+		b.WriteString(row("transport", m.tool.MCPType))
+	}
+	if len(m.tool.TargetHarnesses) > 0 {
+		harnesses := strings.Join(m.tool.TargetHarnesses, ", ")
+		if len(m.tool.TargetHarnesses) == 1 && m.tool.TargetHarnesses[0] == "all" {
+			harnesses = "all installed (claude-code, codex, opencode, droid)"
+		}
+		b.WriteString(row("harnesses", harnesses))
+	}
 	if m.tool.Mandatory {
 		b.WriteString(row("mandatory", "yes — required by other tools"))
+	}
+
+	// Env vars section — for tools (typically MCP servers) that need
+	// runtime secrets like GITHUB_PERSONAL_ACCESS_TOKEN. Surfaced here
+	// so the user sees the requirement BEFORE installing, and again on
+	// the done screen with copy-paste export lines.
+	if len(m.tool.EnvVars) > 0 {
+		b.WriteString("\n  " + label.Render("env vars (set before use)") + "\n")
+		envStyle := lipgloss.NewStyle().Foreground(p.Warn).Bold(true)
+		for _, ev := range m.tool.EnvVars {
+			b.WriteString("    " + envStyle.Render(ev) + "\n")
+		}
 	}
 
 	// Install command for current OS.
