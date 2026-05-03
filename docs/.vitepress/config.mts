@@ -1,5 +1,12 @@
 import { defineConfig } from "vitepress";
 
+const SITE_URL = "https://lfg-docs.netlify.app";
+const SITE_NAME = "LFG";
+const SITE_DESCRIPTION =
+  "Open-source TUI bootstrap CLI — make a new dev machine feel like home in minutes.";
+const OG_IMAGE = `${SITE_URL}/screens/welcome.png`;
+const TWITTER_HANDLE = "@waahbete";
+
 const HERO_CSS = `
 :root {
   --vp-c-brand-1: #a78bfa;
@@ -110,13 +117,49 @@ const HERO_CSS = `
 `;
 
 export default defineConfig({
-  title: "lfg",
-  description:
-    "Open-source TUI bootstrap CLI — make a new dev machine feel like home in minutes.",
+  title: SITE_NAME,
+  description: SITE_DESCRIPTION,
   cleanUrls: true,
   lastUpdated: true,
+  sitemap: { hostname: SITE_URL },
   head: [
-    ["link", { rel: "icon", type: "image/svg+xml", href: "/logo.svg" }],
+    // Favicons
+    ["link", { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" }],
+    ["link", { rel: "alternate icon", href: "/favicon.svg" }],
+    ["link", { rel: "apple-touch-icon", href: "/favicon.svg" }],
+    ["link", { rel: "mask-icon", href: "/favicon.svg", color: "#a78bfa" }],
+    ["meta", { name: "theme-color", content: "#0b0b12", media: "(prefers-color-scheme: dark)" }],
+    ["meta", { name: "theme-color", content: "#ffffff", media: "(prefers-color-scheme: light)" }],
+    ["meta", { name: "color-scheme", content: "light dark" }],
+
+    // Generic SEO
+    ["meta", { name: "author", content: "Anuj Sharma" }],
+    ["meta", { name: "keywords", content: "lfg, cli, bootstrap, dev machine, dotfiles, brew, mise, claude code, codex, tui, charm" }],
+    ["meta", { name: "robots", content: "index, follow" }],
+    ["meta", { name: "application-name", content: SITE_NAME }],
+    ["meta", { name: "apple-mobile-web-app-title", content: SITE_NAME }],
+
+    // Open Graph
+    ["meta", { property: "og:type", content: "website" }],
+    ["meta", { property: "og:site_name", content: SITE_NAME }],
+    ["meta", { property: "og:locale", content: "en_US" }],
+    ["meta", { property: "og:title", content: `${SITE_NAME} — feel back at home, in minutes` }],
+    ["meta", { property: "og:description", content: SITE_DESCRIPTION }],
+    ["meta", { property: "og:url", content: SITE_URL }],
+    ["meta", { property: "og:image", content: OG_IMAGE }],
+    ["meta", { property: "og:image:width", content: "1558" }],
+    ["meta", { property: "og:image:height", content: "1008" }],
+    ["meta", { property: "og:image:alt", content: "LFG TUI welcome screen" }],
+
+    // Twitter / X
+    ["meta", { name: "twitter:card", content: "summary_large_image" }],
+    ["meta", { name: "twitter:site", content: TWITTER_HANDLE }],
+    ["meta", { name: "twitter:creator", content: TWITTER_HANDLE }],
+    ["meta", { name: "twitter:title", content: `${SITE_NAME} — feel back at home, in minutes` }],
+    ["meta", { name: "twitter:description", content: SITE_DESCRIPTION }],
+    ["meta", { name: "twitter:image", content: OG_IMAGE }],
+
+    // Fonts
     ["link", { rel: "preconnect", href: "https://fonts.googleapis.com" }],
     ["link", { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: "" }],
     [
@@ -128,6 +171,29 @@ export default defineConfig({
     ],
     ["style", {}, HERO_CSS],
   ],
+
+  // Per-page canonical + og:title/description overrides.
+  // VitePress emits frontmatter title/description as <title> and <meta name="description">,
+  // but the og:* and canonical tags still need to be derived per page.
+  transformPageData(pageData) {
+    const canonicalUrl = `${SITE_URL}/${pageData.relativePath}`
+      .replace(/index\.md$/, "")
+      .replace(/\.md$/, "");
+    const pageTitle = pageData.title
+      ? `${pageData.title} | ${SITE_NAME}`
+      : `${SITE_NAME} — feel back at home, in minutes`;
+    const pageDesc = pageData.description || SITE_DESCRIPTION;
+
+    pageData.frontmatter.head ??= [];
+    pageData.frontmatter.head.push(
+      ["link", { rel: "canonical", href: canonicalUrl }],
+      ["meta", { property: "og:title", content: pageTitle }],
+      ["meta", { property: "og:description", content: pageDesc }],
+      ["meta", { property: "og:url", content: canonicalUrl }],
+      ["meta", { name: "twitter:title", content: pageTitle }],
+      ["meta", { name: "twitter:description", content: pageDesc }],
+    );
+  },
   themeConfig: {
     logo: "/logo.svg",
     nav: [
