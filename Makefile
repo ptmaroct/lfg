@@ -1,5 +1,5 @@
 # lfg — build, test, snapshot, demo
-.PHONY: build run test snap snap-update widths demo docker docker-bare docker-run docker-shell docker-test docker-test-bare clean release release-snapshot docs-install docs docs-build
+.PHONY: build run test snap snap-update widths demo docker docker-bare docker-run docker-shell docker-test docker-test-bare clean release release-snapshot docs-install docs docs-build hooks
 
 build:
 	go build -o lfg ./cmd/lfg
@@ -94,3 +94,11 @@ docs:
 
 docs-build:
 	cd docs && npm run build
+
+# One-time per clone: wire .githooks/ as the git hooks directory so the
+# commit-msg conventional-commits check runs locally before push. CI
+# enforces the same rules on PRs via .github/workflows/commitlint.yml.
+hooks:
+	git config core.hooksPath .githooks
+	@echo "git hooks installed → .githooks/"
+	@echo "commit messages will be validated against Conventional Commits."

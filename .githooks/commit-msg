@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# lfg commit-msg hook — enforces Conventional Commits locally.
+#
+# Activated per-clone via `make hooks`, which runs:
+#   git config core.hooksPath .githooks
+#
+# CI runs the full commitlint config (commitlint.config.js) on every
+# PR. This hook is a fast pre-flight regex check — catches the obvious
+# "forgot the type prefix" / "wrote 'Fix:' with a capital" cases before
+# you push.
+
+set -euo pipefail
+
+msg_file="$1"
+header=$(head -n1 "$msg_file")
+
+# Skip merge commits, fixups, reverts produced by `git revert`.
+case "$header" in
+  Merge\ * | "fixup! "* | "squash! "* | "Revert \""*) exit 0 ;;
+esac
+
+# Conventional Commits regex:
+#   type(optional-scope)!?: subject
+# Types intentionally mirror commitlint.config.js + release-please.
+pattern='^(feat|fix|perf|refactor|docs|test|build|ci|chore|style|revert|release)(\([a-z0-9._/-]+\))?!?: .{4,}$'
+
+if ! [[ "$header" =~ $pattern ]]; then
+  printf '\n\033[31m✗ commit message rejected\033[0m\n\n'
+  printf '  Header must follow Conventional Commits:\n'
+  printf '    \033[2m<type>(<optional-scope>)!?: <subject>\033[0m\n\n'
+  printf '  Allowed types: feat, fix, perf, refactor, docs, test,\n'
+  printf '                 build, ci, chore, style, revert, release\n\n'
+  printf '  Got:\n    \033[2m%s\033[0m\n\n' "$header"
+  printf '  Examples:\n'
+  printf '    \033[2mfeat(installer): add support for fish shell rc\033[0m\n'
+  printf '    \033[2mfix: respect XDG_CONFIG_HOME on Linux\033[0m\n'
+  printf '    \033[2mfeat!: drop legacy v0.1 preset format\033[0m\n\n'
+  exit 1
+fi
+
+# Subject (everything after the colon-space) must not end in a period.
+subject="${header#*: }"
+if [[ "$subject" == *. ]]; then
+  printf '\n\033[31m✗ subject ends with a period\033[0m\n'
+  printf '    %s\n\n' "$header"
+  exit 1
+fi
+
+# Subject must start lowercase (matches the PR-title rule in CI).
+first_char="${subject:0:1}"
+if [[ "$first_char" =~ [A-Z] ]]; then
+  printf '\n\033[31m✗ subject must start with a lowercase letter\033[0m\n'
+  printf '    %s\n\n' "$header"
+  exit 1
+fi
+
+exit 0

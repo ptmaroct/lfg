@@ -68,6 +68,7 @@ make docker-run      # launch TUI in container
 make docker-shell    # bash inside fresh container, lfg on PATH
 make docker-test     # one-shot: build + auto-run lfg --debug + bash on exit
 make docker-bare     # INCLUDE_BREW=0 — bare ubuntu, exercises brew bootstrap
+make hooks           # one-time: wire .githooks/ for local commit-msg lint
 ```
 
 Single test:
@@ -301,6 +302,58 @@ The agent plan that drove the design lives outside the repo at
 copied to `plan.md` which is gitignored). README has the v0.1 → v1
 roadmap. v0.2 = GitHub auth + remote sync. v0.3 = SSH + macOS defaults.
 Anything not in v0.1 should not land without revisiting that plan.
+
+## Commit messages — Conventional Commits, enforced
+
+**All commits and PR titles must follow Conventional Commits.**
+The `.github/workflows/commitlint.yml` workflow blocks PR merges if
+the title or any commit on the branch fails. The local
+`.githooks/commit-msg` hook (wired via `make hooks`) catches the same
+failures pre-push.
+
+**Format:** `<type>(<optional-scope>)!?: <subject>`
+
+Subject must:
+- start with a **lowercase** letter
+- be ≥4 chars and ≤100 chars
+- **not end with a period**
+- describe the change in the imperative ("add", not "added"/"adds")
+
+**Allowed types** (mirrors `commitlint.config.js`):
+`feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `build`, `ci`,
+`chore`, `style`, `revert`, `release`.
+
+**Release-impact mapping** (release-please derives the next version):
+- `feat:` → minor bump
+- `fix:` / `perf:` → patch bump
+- `feat!:` or `BREAKING CHANGE:` footer → major bump (or minor while
+  pre-1.0 because `bump-minor-pre-major` is set)
+- `docs:` / `chore:` / `test:` / `ci:` / `style:` / `build:` /
+  `refactor:` / `release:` → no release triggered
+
+**Good examples:**
+```
+feat(installer): add support for fish shell rc
+fix: respect XDG_CONFIG_HOME on Linux
+docs(readme): document brew install flow
+ci: bump goreleaser-action to v6
+feat!: drop legacy v0.1 preset format
+```
+
+**Common ways to fail the hook:**
+- `Fix bug` → must be `fix: <something>` (lowercase type, colon, scope)
+- `feat: Added new theme` → subject starts uppercase + past tense
+- `feat: add theme.` → trailing period
+- `update README` → no type prefix
+
+**For squash merges** (which is how this repo merges PRs), the **PR
+title** becomes the commit message on `main` — release-please reads
+that, not the inner commits. The `pr-title` job in commitlint.yml
+enforces the same rules on PR titles. So when opening a PR, write the
+title as if it's the final commit message.
+
+**Co-author trailers** (the `Co-Authored-By:` line) and other footers
+are always allowed; the rules apply only to the header line.
 
 ## Release pipeline
 
