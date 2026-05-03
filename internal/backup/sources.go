@@ -72,7 +72,10 @@ func defaultSources() []Source {
 		rel(".config/zed"),
 		rel(".config/zellij"),
 
-		// AI tooling configs (user-level only, no project-local)
+		// AI tooling configs (user-level only, no project-local).
+		// MCP server configs are folded into these files — claude-code
+		// stores its mcpServers map inside settings.json, codex inside
+		// config.toml. No dedicated entries needed for MCP support.
 		rel(".claude/settings.json"),
 		rel(".claude/CLAUDE.md"),
 		rel(".claude/agents"),

@@ -34,7 +34,7 @@ func EnsureShellPath() (string, error) {
 	var firstErr error
 	for _, rc := range targets {
 		existing, _ := os.ReadFile(rc)
-		updated, changed := upsertManagedBlock(string(existing), block)
+		updated, changed := upsertManagedBlock(string(existing), block, shellRCMarker, shellRCEndMarker)
 		if !changed {
 			continue
 		}
@@ -164,12 +164,18 @@ func buildShellBlock() string {
 }
 
 // upsertManagedBlock replaces an existing fenced block in `existing`
-// with `block`, or appends one if absent. Returns the new file content
-// and a bool indicating whether anything changed.
-func upsertManagedBlock(existing, block string) (string, bool) {
-	startIdx := strings.Index(existing, shellRCMarker)
-	endIdx := strings.Index(existing, shellRCEndMarker)
+// with `block`, or appends one if absent. The fence is identified by
+// the marker pair so the same logic powers both the PATH block
+// (shellRC.go) and the alias block (shellaliases.go). Returns the new
+// file content and a bool indicating whether anything changed.
+func upsertManagedBlock(existing, block, startMarker, endMarker string) (string, bool) {
+	startIdx := strings.Index(existing, startMarker)
+	endIdx := strings.Index(existing, endMarker)
 	if startIdx == -1 || endIdx == -1 || endIdx < startIdx {
+		// Block is being removed and didn't exist → no-op.
+		if strings.TrimSpace(block) == "" {
+			return existing, false
+		}
 		// Append. Ensure single newline between old content + block.
 		out := strings.TrimRight(existing, "\n")
 		if out != "" {
@@ -178,8 +184,26 @@ func upsertManagedBlock(existing, block string) (string, bool) {
 		out += block + "\n"
 		return out, true
 	}
-	// Replace in-place.
-	endIdx += len(shellRCEndMarker)
+	// Replace in-place. If the new block is empty, strip the entire
+	// fenced section so deselecting all aliases leaves no orphan markers.
+	endIdx += len(endMarker)
+	if strings.TrimSpace(block) == "" {
+		// Trim a trailing newline left over from the prior block so the
+		// file doesn't accumulate blank lines on repeated empty writes.
+		tail := existing[endIdx:]
+		if strings.HasPrefix(tail, "\n") {
+			tail = tail[1:]
+		}
+		head := strings.TrimRight(existing[:startIdx], "\n")
+		if head != "" && tail != "" {
+			head += "\n"
+		}
+		rebuilt := head + tail
+		if rebuilt == existing {
+			return existing, false
+		}
+		return rebuilt, true
+	}
 	rebuilt := existing[:startIdx] + block + existing[endIdx:]
 	if rebuilt == existing {
 		return existing, false

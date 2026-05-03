@@ -49,12 +49,29 @@ requires = ["node-lts"]   # optional, gate bundle until tool is selected
 | `install_mac` | string | one of | install command on macOS |
 | `install_linux` | string | one of | install command on Linux |
 | `mandatory` | bool | no | always-on, can't be unchecked |
+| `skip_mac` | bool | no | hide this tool on macOS (host filter applied before render) |
+| `skip_linux` | bool | no | hide this tool on Linux (host filter applied before render) |
 | `post_install` | `[]string` | no | shell commands chained after main install |
 | `skill_url` | string | yes if `source=skills` | URL passed to `npx skills add` |
+| `mcp_type` | string | no | `stdio` (default), `http`, or `sse` |
+| `mcp_package` | string | yes if `mcp_type=stdio` | npm package installed globally + spawned via `npx` |
+| `mcp_command` | string | no | override stdio launch binary (default: `npx`) |
+| `mcp_args` | `[]string` | no | extra args appended to the stdio launch command |
+| `mcp_url` | string | yes if `mcp_type=http` or `sse` | endpoint for remote MCP server |
+| `mcp_headers` | `map[string]string` | no | HTTP headers sent with every remote request |
+| `target_harnesses` | `[]string` | no | harness IDs to auto-register with; `["all"]` = every harness lfg knows |
+| `env_vars` | `[]string` | no | runtime env vars surfaced in info card + done screen |
 
 At least one of `install_mac` / `install_linux` is required.
 `post_install` failures surface as warnings — the main install still
 counts as success.
+
+Use `skip_mac` / `skip_linux` when a tool only makes sense on one
+platform. Built-in `terminal-essentials` uses both: `ghostty` ships
+only via macOS cask, and the brew `zsh` override is Linux-only since
+recent macOS already ships a current zsh. Filtered tools never appear
+in the picker, so users on the other OS don't see a placeholder they
+can't act on.
 
 ## Source backends
 
@@ -66,6 +83,7 @@ counts as success.
 | `npm` | `npm i -g <pkg>` |
 | `curl` | arbitrary `curl … \| sh` install scripts |
 | `skills` | `npx skills add <skill_url>` |
+| `mcp` | install (npm for stdio, no-op for remote) + auto-register with every target harness on PATH (gated on `node-lts`) |
 | `custom` | the `install_mac` / `install_linux` strings as-is |
 
 `brew`, `mise`, and `node` are bootstrap-able — if any selected tool

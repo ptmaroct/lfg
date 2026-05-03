@@ -8,14 +8,35 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/ptmaroct/lfg/internal/preset"
 )
 
-// doneModel — final celebration card. Big checkmark, headline, next-step list.
+// doneModel — final celebration card. Big checkmark, headline,
+// next-step list, and (when the install included MCP servers needing
+// secrets) a "set these env vars" section with copy-paste export lines.
 type doneModel struct {
-	palette Palette
+	palette  Palette
+	bundles  []preset.Bundle
+	selected map[string]bool
+	aliases  []preset.Alias
 }
 
-func newDone(p Palette) doneModel { return doneModel{palette: p} }
+func newDone(p Palette, bundles []preset.Bundle, selected map[string]bool, aliases []preset.Alias) doneModel {
+	return doneModel{palette: p, bundles: bundles, selected: selected, aliases: aliases}
+}
+
+// hasReloadAlias reports whether the user picked the `reload` shortcut,
+// in which case the next-step "reload your shell" command can be the
+// short alias instead of the literal `exec bash`/`exec zsh`.
+func (m doneModel) hasReloadAlias() bool {
+	for _, a := range m.aliases {
+		if a.Name == "reload" {
+			return true
+		}
+	}
+	return false
+}
 
 func (m doneModel) Init() tea.Cmd { return nil }
 
@@ -49,6 +70,9 @@ func (m doneModel) View(width, height int) string {
 	b.WriteString("\n\n")
 
 	reload := reloadShellCmd()
+	if m.hasReloadAlias() {
+		reload = "reload"
+	}
 	steps := []struct{ cmd, desc string }{
 		{reload, "reload your shell (PATH updates already written to your rc)"},
 		{"lfg backup", "snapshot this machine"},
@@ -61,6 +85,40 @@ func (m doneModel) View(width, height int) string {
 		b.WriteString("  " + num + "  " + cmd + desc + "\n")
 	}
 	b.WriteString("\n")
+
+	// Env vars section — listed when any installed tool declares EnvVars
+	// (typically MCP servers needing GITHUB_PERSONAL_ACCESS_TOKEN etc).
+	// Renders one `export FOO=...` line per var so the user can paste
+	// straight into their shell rc. We never collect or write the values
+	// — just remind the user what to set.
+	if envs := requiredEnvVars(m.bundles, m.selected); len(envs) > 0 {
+		b.WriteString(SectionLabel(p, "Env vars to set", "before MCP servers can run", contentW))
+		b.WriteString("\n\n")
+		boxStyle := lipgloss.NewStyle().Foreground(p.Text).Background(p.Panel).Padding(0, 1)
+		for _, ev := range envs {
+			b.WriteString("  " + boxStyle.Render("export "+ev+"=...") + "\n")
+		}
+		b.WriteString("\n")
+	}
+
+	// Aliases section — only shown when the user picked at least one.
+	// Renders one line per alias with `name → expansion`, mirroring the
+	// env vars boxStyle so the section reads as a status report rather
+	// than something the user still has to act on.
+	if len(m.aliases) > 0 {
+		b.WriteString(SectionLabel(p, "Aliases configured",
+			fmt.Sprintf("written to your shell rc · %d total", len(m.aliases)), contentW))
+		b.WriteString("\n\n")
+		nameStyle := lipgloss.NewStyle().Foreground(p.Primary).Bold(true)
+		arrowStyle := lipgloss.NewStyle().Foreground(p.Muted)
+		cmdStyle := lipgloss.NewStyle().Foreground(p.Text)
+		for _, a := range m.aliases {
+			b.WriteString("  " + nameStyle.Render(fmt.Sprintf("%-7s", a.Name)) +
+				arrowStyle.Render("→  ") +
+				cmdStyle.Render(a.Command) + "\n")
+		}
+		b.WriteString("\n")
+	}
 
 	// Star CTA + attribution. Centered so it reads as a sign-off.
 	star := lipgloss.NewStyle().Foreground(p.Warn).Bold(true).Render("★")
@@ -83,6 +141,31 @@ func (m doneModel) View(width, height int) string {
 		HintLine(p, KeyHint(p, "any", "exit")),
 		height < 22,
 	)
+}
+
+// requiredEnvVars walks the install plan (bundles × selected map) and
+// returns a deduped, stable-ordered list of env vars the installed
+// tools declared. Used by the done screen to surface MCP secrets the
+// user must set before the servers will function.
+func requiredEnvVars(bundles []preset.Bundle, selected map[string]bool) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, b := range bundles {
+		for _, t := range b.Tools {
+			key := b.ID + "/" + t.Name
+			if !selected[key] {
+				continue
+			}
+			for _, ev := range t.EnvVars {
+				if seen[ev] {
+					continue
+				}
+				seen[ev] = true
+				out = append(out, ev)
+			}
+		}
+	}
+	return out
 }
 
 // reloadShellCmd returns the literal command the user should run to

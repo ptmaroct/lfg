@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/ptmaroct/lfg/internal/installer"
+	"github.com/ptmaroct/lfg/internal/preset"
 	"github.com/ptmaroct/lfg/internal/state"
 	"github.com/ptmaroct/lfg/internal/tui"
 )
@@ -46,7 +47,7 @@ func runTUI() error {
 	// the user sees animated progress instead of a frozen terminal while
 	// goroutines fan out. Probe finishes → transition to welcome with
 	// detect-applied bundles + the harness list set on the installer pkg.
-	bundles, err := loadPreset()
+	loaded, err := loadPreset()
 	if err != nil {
 		return err
 	}
@@ -61,13 +62,29 @@ func runTUI() error {
 		fmt.Fprintln(os.Stderr, "lfg: dry-run mode — no commands will be executed")
 	}
 
+	aliasGroups := preset.GroupAliases(loaded.Aliases)
 	p := tea.NewProgram(
-		tui.NewWithProbe(theme, bundles, opts...),
+		tui.NewWithProbeAndAliases(theme, loaded.Bundles, aliasGroups, opts...),
 		tea.WithAltScreen(),
 	)
 	final, runErr := p.Run()
 	if runErr != nil {
 		return fmt.Errorf("tui run: %w", runErr)
+	}
+
+	// Write user-selected aliases to every detected shell rc. We do
+	// this AFTER the TUI exits so the Charm program owns the terminal
+	// during interactive parts; the actual file write is fast and
+	// non-interactive. Best-effort: errors print to stderr but never
+	// fail the whole run.
+	if m, ok := final.(tui.Model); ok && !dryRun {
+		if picked := m.SelectedAliases(); len(picked) > 0 {
+			if written, werr := installer.EnsureShellAliases(picked); werr != nil {
+				fmt.Fprintln(os.Stderr, "lfg: alias write:", werr)
+			} else if written != "" {
+				fmt.Fprintln(os.Stderr, "lfg: aliases written →", written)
+			}
+		}
 	}
 
 	// On clean exit, save the theme that was active when the user quit

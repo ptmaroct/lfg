@@ -19,15 +19,16 @@ import (
 // home directory; on submit calls preset.Save and shows a confirmation
 // with the full path.
 type exportModel struct {
-	palette  Palette
-	bundles  []preset.Bundle
-	input    textinput.Model
-	saved    bool
-	savedAt  string
-	err      string
+	palette Palette
+	bundles []preset.Bundle
+	aliases []preset.Alias
+	input   textinput.Model
+	saved   bool
+	savedAt string
+	err     string
 }
 
-func newExport(p Palette, bundles []preset.Bundle) exportModel {
+func newExport(p Palette, bundles []preset.Bundle, aliases []preset.Alias) exportModel {
 	ti := textinput.New()
 	ti.Prompt = "› "
 	ti.PromptStyle = lipgloss.NewStyle().Foreground(p.Primary).Bold(true)
@@ -44,7 +45,7 @@ func newExport(p Palette, bundles []preset.Bundle) exportModel {
 		ti.SetValue("lfg-preset.toml")
 	}
 	ti.Focus()
-	return exportModel{palette: p, bundles: bundles, input: ti}
+	return exportModel{palette: p, bundles: bundles, aliases: aliases, input: ti}
 }
 
 func (m exportModel) Init() tea.Cmd { return textinput.Blink }
@@ -65,7 +66,7 @@ func (m exportModel) Update(msg tea.Msg) (exportModel, tea.Cmd) {
 				m.err = "enter a file path"
 				return m, nil
 			}
-			if err := preset.Save(path, m.bundles); err != nil {
+			if err := preset.Save(path, m.bundles, m.aliases); err != nil {
 				m.err = err.Error()
 				return m, nil
 			}

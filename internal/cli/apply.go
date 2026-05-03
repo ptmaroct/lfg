@@ -48,7 +48,7 @@ func runApply(cmd *cobra.Command, args []string) error {
 		wanted[a] = true
 	}
 
-	bundles, err := loadPreset()
+	bundles, err := loadBundles()
 	if err != nil {
 		return err
 	}

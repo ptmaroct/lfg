@@ -10,31 +10,31 @@
                                                                                                                                                                                                         
                                                                                                                                                                                                         
                                                                                                                                                                                                         
-                                                                                                                                                                                                        
-                                                                                                                                                                                                        
-                                                                                                                                                                                                        
-                                                                                                                                                                                                        
-                                                                                                                                                                                                        
                                                   ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓                                                  
-                                                  ┃  ▌ lfg │ DETECTING                                                                    THEME LFG  ┃                                                  
+                                                  ┃  ▌ lfg │ STEP 4 · ALIASES                                                             THEME LFG  ┃                                                  
                                                   ┃──────────────────────────────────────────────────────────────────────────────────────────────────┃                                                  
                                                   ┃                                                                                                  ┃                                                  
-                                                  ┃┃ DETECTING INSTALLED TOOLS                                                              0 OF 30  ┃                                                  
+                                                  ┃┃ SHELL ALIASES                                                    OPTIONAL · WRITTEN TO YOUR RC  ┃                                                  
                                                   ┃                                                                                                  ┃                                                  
-                                                  ┃  00 PROBED  │  30 TOTAL  │  0% PCT                                                               ┃                                                  
+                                                  ┃  Quality-of-life shortcuts. We write a fenced block to every detected                            ┃                                                  
+                                                  ┃  shell rc; deselecting all leaves your rc unchanged.                                             ┃                                                  
                                                   ┃                                                                                                  ┃                                                  
-                                                  ┃  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░                                    ┃                                                  
-                                                  ┃                                                                                                  ┃                                                  
-                                                  ┃  starting…                                                                                       ┃                                                  
-                                                  ┃                                                                                                  ┃                                                  
+                                                  ┃Pick shell aliases                                                                                ┃                                                  
+                                                  ┃Selected aliases get added to a fenced lfg-managed block in your shell rc(s).                     ┃                                                  
+                                                  ┃You can re-run lfg anytime to change selection.                                                   ┃                                                  
+                                                  ┃> ✓ gd      checkout develop + pull                                                               ┃                                                  
+                                                  ┃  ✓ gf      fetch all remotes, prune                                                              ┃                                                  
+                                                  ┃  ✓ gs      git status                                                                            ┃                                                  
+                                                  ┃  ✓ gp      git push                                                                              ┃                                                  
+                                                  ┃  ✓ gl      compact recent log                                                                    ┃                                                  
+                                                  ┃  ✓ gco     git checkout                                                                          ┃                                                  
+                                                  ┃  ✓ c       claude (normal mode)                                                                  ┃                                                  
+                                                  ┃  ✓ cr      claude resume                                                                         ┃                                                  
+                                                  ┃  ✓ cw      claude worktree                                                                       ┃                                                  
                                                   ┃                                                                                                  ┃                                                  
                                                   ┃──────────────────────────────────────────────────────────────────────────────────────────────────┃                                                  
-                                                  ┃  [⏎] SKIP  [^C] QUIT                                                                             ┃                                                  
+                                                  ┃  [x] TOGGLE  [⏎] CONTINUE  [^S] SUBMIT NOW  [ESC] SKIP                                           ┃                                                  
                                                   ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛                                                  
-                                                                                                                                                                                                        
-                                                                                                                                                                                                        
-                                                                                                                                                                                                        
-                                                                                                                                                                                                        
                                                                                                                                                                                                         
                                                                                                                                                                                                         
                                                                                                                                                                                                         

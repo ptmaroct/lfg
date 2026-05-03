@@ -7,31 +7,31 @@
                                                                                                                                                                 
                                                                                                                                                                 
                                                                                                                                                                 
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
                               ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓                              
-                              ┃  ▌ lfg │ STEP 1/2 · PICK TOOLS                                                        THEME LFG  ┃                              
+                              ┃  ▌ lfg │ STEP 4 · ALIASES                                                             THEME LFG  ┃                              
                               ┃──────────────────────────────────────────────────────────────────────────────────────────────────┃                              
                               ┃                                                                                                  ┃                              
-                              ┃┃ PICK WHAT TO INSTALL                                                                8 SELECTED  ┃                              
+                              ┃┃ SHELL ALIASES                                                    OPTIONAL · WRITTEN TO YOUR RC  ┃                              
                               ┃                                                                                                  ┃                              
-                              ┃        BUNDLE / TOOL           INSTALLED    VIA                                                  ┃                              
-                              ┃  ──────────────────────────────────────────────────────────────────────────────────────────────  ┃                              
-                              ┃▸ [✓] ▶ BAREBONES               8/8 picked                                                        ┃                              
-                              ┃  [ ] ▶ TERMINAL-ESSENTIALS     0/6 picked                                                        ┃                              
-                              ┃  [ ] ▶ AI-HARNESSES            0/4 picked                                                        ┃                              
-                              ┃  [ ] ▶ SKILLS                  0/6 picked                                                        ┃                              
-                              ┃  [ ] ▶ MCP                     0/6 picked                                                        ┃                              
-                              ┃  ──────────────────────────────────────────────────────────────────────────────────────────────  ┃                              
+                              ┃  Quality-of-life shortcuts. We write a fenced block to every detected                            ┃                              
+                              ┃  shell rc; deselecting all leaves your rc unchanged.                                             ┃                              
                               ┃                                                                                                  ┃                              
+                              ┃Pick shell aliases                                                                                ┃                              
+                              ┃Selected aliases get added to a fenced lfg-managed block in your shell rc(s).                     ┃                              
+                              ┃You can re-run lfg anytime to change selection.                                                   ┃                              
+                              ┃> ✓ gd      checkout develop + pull                                                               ┃                              
+                              ┃  ✓ gf      fetch all remotes, prune                                                              ┃                              
+                              ┃  ✓ gs      git status                                                                            ┃                              
+                              ┃  ✓ gp      git push                                                                              ┃                              
+                              ┃  ✓ gl      compact recent log                                                                    ┃                              
+                              ┃  ✓ gco     git checkout                                                                          ┃                              
+                              ┃  ✓ c       claude (normal mode)                                                                  ┃                              
+                              ┃  ✓ cr      claude resume                                                                         ┃                              
+                              ┃  ✓ cw      claude worktree                                                                       ┃                              
                               ┃                                                                                                  ┃                              
                               ┃──────────────────────────────────────────────────────────────────────────────────────────────────┃                              
-                              ┃  [↑↓] NAV  [→←] TREE  [SP] TOGGLE  [I] INFO  [A] ALL  [⏎] NEXT  [ESC] BACK                       ┃                              
+                              ┃  [x] TOGGLE  [⏎] CONTINUE  [^S] SUBMIT NOW  [ESC] SKIP                                           ┃                              
                               ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛                              
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
                                                                                                                                                                 
                                                                                                                                                                 
                                                                                                                                                                 

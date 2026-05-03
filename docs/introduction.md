@@ -40,10 +40,12 @@ and runs on macOS and Linux (Windows is on the long-term roadmap).
 
 ## Status
 
-v0.3 is shipped: real installers, PostInstall hooks, async live
-version resolver, `lfg backup` / `lfg doctor` / `lfg update`, four
-themes. Snapshot tests still see deterministic mock data so test runs
-never touch your system.
+v0.3 is the latest stable: real installers, PostInstall hooks, async
+live version resolver, `lfg backup` / `lfg doctor` / `lfg update`,
+four themes. v0.4 ships the `terminal-essentials` bundle and renames
+`dev-tools` to `ai-harnesses` — currently on the beta channel via
+`brew install ptmaroct/tap/lfg-beta`. Snapshot tests still see
+deterministic mock data so test runs never touch your system.
 
 The roadmap (sync, SSH fleet management, macOS `defaults` wizard) is
 on the [Roadmap page](/project/roadmap).

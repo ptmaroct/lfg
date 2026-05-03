@@ -23,13 +23,12 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
           target-branch: main
-          # release-please only manages the PR + tag; the actual GitHub
-          # Release (with artifacts) is published by goreleaser when it
-          # picks up the tag push. Two creators on the same tag race.
-          skip-github-release: true
+          # release-please owns the tag + GitHub Release body (changelog).
+          # goreleaser appends artifacts to the existing release on tag
+          # push (see .goreleaser.yaml release.mode: append).

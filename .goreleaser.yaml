@@ -126,3 +126,8 @@ release:
     name: lfg
   prerelease: auto
   draft: false
+  # release-please creates the GitHub Release with the changelog body
+  # before this workflow fires. `append` makes goreleaser upload its
+  # archives + checksums to that existing release without overwriting
+  # the body. `replace` would clobber release-please's changelog.
+  mode: append

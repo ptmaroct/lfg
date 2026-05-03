@@ -3,7 +3,18 @@ title: Install
 description: Three ways to get the lfg binary on your machine.
 ---
 
-## One-liner (recommended)
+## Homebrew
+
+```sh
+brew install ptmaroct/tap/lfg          # stable
+brew install ptmaroct/tap/lfg-beta     # preview channel — fastest moving
+```
+
+The tap is auto-published by goreleaser on every release. Stable and
+beta install side-by-side as different formulae; pick one or both.
+Upgrade with `brew upgrade ptmaroct/tap/lfg` (or `…/lfg-beta`).
+
+## One-liner
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/ptmaroct/lfg/main/install.sh | sh
@@ -70,8 +81,9 @@ and doesn't drop config until you launch it for the first time.
 Uninstalling is two `rm`s:
 
 ```sh
-rm $(command -v lfg)         # binary
-rm -rf ~/.config/lfg         # state, logs, key, config
+brew uninstall ptmaroct/tap/lfg   # if installed via brew
+rm $(command -v lfg)              # otherwise: remove binary
+rm -rf ~/.config/lfg              # state, logs, key, config
 ```
 
 The `# lfg-managed PATH` block in your shell rc files can be deleted
