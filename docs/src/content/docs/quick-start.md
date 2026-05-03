@@ -14,7 +14,7 @@ lfg --config ./my-preset.toml      # load custom bundles
 `--dry-run` (or `-n`) walks every flow without exec'ing anything. Theme
 persists in `~/.config/lfg/state.json`.
 
-![welcome](/lfg/screens/welcome.png)
+![welcome](/screens/welcome.png)
 
 ## The TUI flow
 

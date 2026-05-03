@@ -46,4 +46,4 @@ themes. Snapshot tests still see deterministic mock data so test runs
 never touch your system.
 
 The roadmap (sync, SSH fleet management, macOS `defaults` wizard) is
-on the [Roadmap page](/lfg/project/roadmap/).
+on the [Roadmap page](/project/roadmap/).
