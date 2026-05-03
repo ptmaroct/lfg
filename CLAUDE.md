@@ -370,16 +370,13 @@ holds two formulae:
   Merging the PR tags `vX.Y.Z` → `release.yml` runs goreleaser →
   binaries land on GitHub Releases AND `lfg.rb` is rewritten in the
   tap.
-- Push to `develop` → `release-please-beta.yml` opens "Release
-  vX.Y.Z-beta.N" PR. Merge tags the prerelease → goreleaser publishes
-  prerelease binaries AND rewrites `lfg-beta.rb` only (the stable
-  `lfg.rb` is untouched because of `skip_upload: auto` on prereleases).
-
-**Why two release-please workflows + configs?** Each channel needs
-its own `manifest` file (`.release-please-manifest.json` vs
-`.release-please-manifest-beta.json`) so release-please can track the
-last-released version per channel independently. Sharing one manifest
-would make beta increments overwrite stable's last-released marker.
+- Beta tags are **manual**: `git tag v0.4.0-beta.0 && git push
+  origin v0.4.0-beta.0` from a develop tip. The tag push triggers
+  `release.yml` → goreleaser sees `.Prerelease=true` and writes
+  `lfg-beta.rb` only (stable `lfg.rb` skipped via `skip_upload:
+  auto`). release-please does not manage betas because its
+  prerelease versioning support didn't reliably produce
+  `vX.Y.Z-beta.N` tags from a stable manifest baseline.
 
 **release-please vs goreleaser ownership.** release-please owns the
 PR + CHANGELOG.md + tag + GitHub Release body. goreleaser owns the
