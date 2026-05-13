@@ -87,16 +87,12 @@ func init() {
 	registry["curl"] = registry["custom"]
 }
 
-// installCmd picks the right install command for the host OS. Returns
-// an empty string when the tool has no command defined for this platform
-// — caller should treat that as a no-op + meta line.
+// installCmd picks the right install command for the host OS, with
+// the tool's Pin substituted in (see preset.Tool.ResolvedInstall).
+// Returns an empty string when the tool has no command defined for
+// this platform — caller should treat that as a no-op + meta line.
 func installCmd(t preset.Tool) string {
-	if runtime.GOOS == "darwin" {
-		return strings.TrimSpace(t.InstallMac)
-	}
-	// Treat everything non-darwin as Linux for now. Windows is out of
-	// scope (see plan). BSDs would route here too — reasonable default.
-	return strings.TrimSpace(t.InstallLinux)
+	return strings.TrimSpace(t.ResolvedInstall(runtime.GOOS))
 }
 
 // Plan turns selected tools into an ordered list of Steps with the

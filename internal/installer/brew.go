@@ -28,6 +28,15 @@ func (b brewInstaller) Bootstrap(ctx context.Context, out chan<- Line) error {
 		out <- Line{Tool: "brew", Stream: "meta", Text: "brew already installed"}
 		return nil
 	}
+	// Use the pinned SHA256 from pins.toml when available so the
+	// bootstrap path matches the explicit-brew-tool install path. If
+	// the pin is missing (older binary, hand-rolled config) fall back
+	// to the un-verified curl-bash command for usability.
+	if sha := preset.CurrentPins().Pins["barebones/brew"].SHA256; sha != "" {
+		return runVerifiedCurl(ctx, "brew", brewBootstrapCmd, sha, out)
+	}
+	out <- Line{Tool: "brew", Stream: "meta",
+		Text: "WARN: no PinSHA256 for brew installer — running unverified"}
 	return runCmd(ctx, "brew", brewBootstrapCmd, out)
 }
 

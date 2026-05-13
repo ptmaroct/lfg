@@ -15,11 +15,28 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/ptmaroct/lfg/internal/preset"
 )
+
+// TestMain freezes the pin-freshness clock + injects a deterministic
+// pin set so welcome-screen snapshots don't drift with wall time.
+// Without this every snapshot would expire daily as the embedded
+// BumpedAt aged.
+func TestMain(m *testing.M) {
+	fixedNow, _ := time.Parse(time.RFC3339, "2026-05-13T12:00:00Z")
+	restoreClock := preset.SetNowForTest(fixedNow)
+	defer restoreClock()
+	restorePins := preset.SetPinsForTest(preset.PinSet{
+		BumpedAt: fixedNow.Add(-3 * 24 * time.Hour), // "fresh" bucket
+		Pins:     map[string]preset.PinEntry{"placeholder": {Version: "x"}},
+	})
+	defer restorePins()
+	os.Exit(m.Run())
+}
 
 // presetAllForTest returns the same hardcoded bundle data the TUI uses
 // in tests (preset.All). Hoisted to its own function so multiple tests

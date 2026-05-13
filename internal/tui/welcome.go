@@ -1,11 +1,15 @@
 package tui
 
 import (
+	"context"
+	"fmt"
 	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/ptmaroct/lfg/internal/preset"
 )
 
 // welcomeModel — first-screen entry. Custom render (not huh) so we can
@@ -34,6 +38,24 @@ func logoTickCmd() tea.Cmd {
 	return tea.Tick(220*time.Millisecond, func(time.Time) tea.Msg {
 		return logoTickMsg{}
 	})
+}
+
+// remotePinsAppliedMsg fires after the async pin-fetcher lands a
+// fresher PinSet from GitHub raw. Triggers a re-render so the
+// freshness chip in the welcome chrome updates.
+type remotePinsAppliedMsg struct{}
+
+// remotePinsFetchCmd fires once on welcome Init. 2s timeout inside
+// FetchRemotePins; on failure we silently keep the embedded pins.
+func remotePinsFetchCmd() tea.Cmd {
+	return func() tea.Msg {
+		ps, err := preset.FetchRemotePins(context.Background(), preset.DefaultRemotePinsURL)
+		if err != nil {
+			return nil
+		}
+		preset.SetRemotePins(ps)
+		return remotePinsAppliedMsg{}
+	}
 }
 
 func newWelcome(p Palette) welcomeModel {
@@ -69,13 +91,19 @@ func newWelcome(p Palette) welcomeModel {
 	}
 }
 
-func (m welcomeModel) Init() tea.Cmd { return logoTickCmd() }
+func (m welcomeModel) Init() tea.Cmd {
+	return tea.Batch(logoTickCmd(), remotePinsFetchCmd())
+}
 
 func (m welcomeModel) Update(msg tea.Msg) (welcomeModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case logoTickMsg:
 		m.phase = (m.phase + 1) % 1000 // any large number; mod inside renderer
 		return m, logoTickCmd()
+	case remotePinsAppliedMsg:
+		// Pin freshness chip now reflects the freshly-fetched set; no
+		// state change needed since CurrentPins() is consulted at render.
+		return m, nil
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "up", "k":
@@ -117,6 +145,8 @@ func (m welcomeModel) View(width, height int) string {
 	tagline := lipgloss.NewStyle().Foreground(p.Muted).Italic(true).
 		Render("a new dev machine, in less time than this hint takes to read")
 	b.WriteString(lipgloss.PlaceHorizontal(contentW, lipgloss.Center, tagline))
+	b.WriteString("\n")
+	b.WriteString(lipgloss.PlaceHorizontal(contentW, lipgloss.Center, renderPinFreshness(p)))
 	b.WriteString("\n\n")
 
 	// Actions section
@@ -166,6 +196,31 @@ func (m welcomeModel) renderChoice(i int, c welcomeChoice, contentW int) string 
 	line2 := strings.Repeat(" ", 6) + descStyle.Render(c.desc)
 	_ = contentW
 	return line1 + "\n" + line2
+}
+
+// renderPinFreshness draws the "pins: 2026-05-13 (3 d)" chip under
+// the welcome tagline. Colour shifts as the embedded pin set ages,
+// nudging long-running users to `lfg update` once they cross the
+// 30-day mark. Hidden entirely when no pin set is loaded (e.g. fresh
+// fork, custom config) so we don't shout "unknown" at first-run.
+func renderPinFreshness(p Palette) string {
+	ps := preset.CurrentPins()
+	if ps.BumpedAt.IsZero() {
+		return ""
+	}
+	ageDays, bucket := preset.PinFreshness()
+	colour := p.Success
+	suffix := ""
+	switch bucket {
+	case "stale":
+		colour = p.Accent
+		suffix = " — consider `lfg update`"
+	case "very-stale":
+		colour = p.Primary
+		suffix = " — run `lfg update`"
+	}
+	label := fmt.Sprintf("pins: %s (%d d)%s", ps.BumpedAt.Format("2006-01-02"), ageDays, suffix)
+	return lipgloss.NewStyle().Foreground(colour).Render(label)
 }
 
 // sprint1 — tiny int→string for 1..9. Avoids importing strconv.
