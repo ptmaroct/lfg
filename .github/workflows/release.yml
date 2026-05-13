@@ -26,20 +26,25 @@ jobs:
   goreleaser:
     runs-on: ubuntu-latest
     steps:
+      # Every external action below is pinned to a full commit SHA so a
+      # rewritten tag (cf. tj-actions/changed-files, CVE-2025-30066)
+      # can't silently redirect us to malicious code. Dependabot keeps
+      # these SHAs updated via reviewed PRs; the human-readable tag
+      # follows each SHA as a comment so we can spot stale pins.
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
           fetch-depth: 0
 
       - name: set up go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version: stable
           cache: true
 
       - name: run goreleaser
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6.4.0
         with:
           distribution: goreleaser
           version: "~> v2"

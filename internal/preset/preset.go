@@ -104,6 +104,132 @@ type Tool struct {
 	// ships a satisfactory equivalent (e.g. macOS bundles a recent zsh).
 	SkipMac   bool `toml:"skip_mac,omitempty"`
 	SkipLinux bool `toml:"skip_linux,omitempty"`
+	// Pin is the resolved exact version this tool should install at.
+	// Empty = no pin (caller falls back to whatever the install command
+	// resolves on its own — usually "latest"). Maintained by the weekly
+	// preset-bump bot via pins.toml, never edited by hand. See
+	// docs/versioning.md.
+	Pin string `toml:"pin,omitempty"`
+	// PinSHA256 is the expected hex digest of a curl-piped install
+	// script (e.g. https://astral.sh/uv/install.sh). The installer
+	// downloads the script first and refuses to execute it unless the
+	// hash matches. Empty = no verification (logged as a warning).
+	PinSHA256 string `toml:"pin_sha256,omitempty"`
+}
+
+// ResolvedInstall returns the install command for the given GOOS with
+// the tool's Pin substituted in. When Pin is empty, returns the raw
+// command unchanged (i.e. the caller gets `mise use -g node@lts` /
+// `npm install -g @openai/codex` etc., which install whatever the
+// registry currently labels latest).
+//
+// Two substitution shapes:
+//
+//   - existing `@<token>` (e.g. `node@lts`) -> token replaced with Pin
+//   - npm-style global install with no `@<ver>` -> `@<Pin>` appended
+//     to the package argument. Scoped packages (`@openai/codex`) are
+//     handled correctly: only the trailing `@` is added.
+func (t Tool) ResolvedInstall(goos string) string {
+	cmd := t.InstallMac
+	if goos != "darwin" {
+		cmd = t.InstallLinux
+	}
+	if t.Pin == "" {
+		return cmd
+	}
+	// Only sources whose install verb cleanly accepts a `@<ver>` token
+	// get textual substitution. Brew formulas can't be version-pinned
+	// via `brew install <name>@x.y.z` for unversioned formulas, so we
+	// leave brew commands alone (the Pin is still recorded for display
+	// + bumper drift tracking).
+	switch t.Source {
+	case "npm", "mise":
+		return rewriteWithPin(cmd, t.Pin)
+	}
+	return cmd
+}
+
+// rewriteWithPin applies the Pin substitution rules to a single
+// command line. Exported for the bumper's diff preview.
+func rewriteWithPin(cmd, pin string) string {
+	if cmd == "" || pin == "" {
+		return cmd
+	}
+	fields := splitCmdKeepSep(cmd)
+	// Pass 1: replace existing @<ver> tokens (right-to-left so we hit
+	// the version pin, not a scoped package's leading `@`).
+	replaced := false
+	for i := len(fields) - 1; i >= 0; i-- {
+		f := fields[i]
+		if at := lastAt(f); at > 0 && f[at-1] != '/' {
+			fields[i] = f[:at+1] + pin
+			replaced = true
+			break
+		}
+	}
+	if replaced {
+		return joinFields(fields)
+	}
+	// Pass 2: npm-style `install -g <pkg>` with no @ver — append @<pin>
+	// to the package arg. splitCmdKeepSep preserves whitespace runs as
+	// their own tokens, so we skip past separator + flag tokens to land
+	// on the package argument.
+	for i, f := range fields {
+		if f != "install" && f != "i" && f != "add" {
+			continue
+		}
+		for j := i + 1; j < len(fields); j++ {
+			fj := fields[j]
+			if fj == "" || fj[0] == ' ' || fj[0] == '\t' || fj[0] == '\n' {
+				continue
+			}
+			if fj[0] == '-' {
+				continue
+			}
+			// First non-whitespace, non-flag token after the verb = pkg.
+			if at := lastAt(fj); at <= 0 || fj[at-1] == '/' {
+				fields[j] = fj + "@" + pin
+				return joinFields(fields)
+			}
+			break
+		}
+	}
+	return cmd
+}
+
+// splitCmdKeepSep tokenizes preserving the runs of whitespace so
+// joinFields can reconstruct the original spacing. Compared to
+// splitCmd (which drops separators) this lets us round-trip a command
+// after an in-place substitution.
+func splitCmdKeepSep(s string) []string {
+	out := []string{}
+	cur := []byte{}
+	flush := func() {
+		if len(cur) > 0 {
+			out = append(out, string(cur))
+			cur = cur[:0]
+		}
+	}
+	inSep := false
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		isSep := c == ' ' || c == '\t' || c == '\n'
+		if isSep != inSep {
+			flush()
+			inSep = isSep
+		}
+		cur = append(cur, c)
+	}
+	flush()
+	return out
+}
+
+func joinFields(parts []string) string {
+	out := make([]byte, 0, 64)
+	for _, p := range parts {
+		out = append(out, p...)
+	}
+	return string(out)
 }
 
 // PlannedVersion returns the version string lfg will install for this
@@ -202,11 +328,21 @@ type Bundle struct {
 	Tools       []Tool `toml:"tools"`
 }
 
-// All returns the bundles shipped with the CLI by default. Three
-// bundles: barebones (universal foundation), terminal-essentials
-// (interactive shell tooling), ai-harnesses (AI coding CLIs), skills
-// (cross-harness skill packs), mcp (Model Context Protocol servers).
+// All returns the bundles shipped with the CLI by default with
+// version pins applied from the embedded pins.toml (or, when a fresh
+// copy is available remotely, from the in-memory override set by
+// SetRemotePins). Five bundles: barebones (universal foundation),
+// terminal-essentials (interactive shell tooling), ai-harnesses
+// (AI coding CLIs), skills (cross-harness skill packs), mcp (Model
+// Context Protocol servers).
 func All() []Bundle {
+	return applyPins(rawBundles(), CurrentPins())
+}
+
+// rawBundles is the un-pinned source of truth. Tests + tooling that
+// want to inspect the raw shape (without pin substitution) call this
+// directly.
+func rawBundles() []Bundle {
 	return []Bundle{
 		{
 			ID:          "barebones",

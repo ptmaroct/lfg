@@ -1,0 +1,49 @@
+# Auto-tag a patch release when the bumper's PR merges into main.
+#
+# Why: pin data lives inside the binary. Without a release on every
+# bumper merge, end users would only get fresh pins via a manual
+# release. The runtime remote-pins fetch (see internal/preset/pins.go
+# + SetRemotePins) covers running binaries; this workflow covers the
+# brew bottle / curl-installed binary path for net-new users.
+#
+# Path filter ensures we only retag when pins.toml actually changed,
+# not on every main-branch push.
+
+name: release-on-pins
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "internal/preset/pins.toml"
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: compute next patch tag
+        id: next
+        run: |
+          set -euo pipefail
+          last="$(git describe --tags --abbrev=0 2>/dev/null || echo v0.0.0)"
+          patch="$(echo "$last" | awk -F. '{print $NF+1}')"
+          new="$(echo "$last" | awk -F. -v p="$patch" '{$NF=p; print}' OFS=.)"
+          echo "tag=$new" >> "$GITHUB_OUTPUT"
+          echo "computed next tag: $new (from $last)"
+
+      - name: tag and push
+        run: |
+          set -euo pipefail
+          git config user.name  "lfg-bot"
+          git config user.email "lfg-bot@users.noreply.github.com"
+          git tag "${{ steps.next.outputs.tag }}"
+          git push origin "${{ steps.next.outputs.tag }}"

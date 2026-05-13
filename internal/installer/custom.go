@@ -20,7 +20,15 @@ func (customInstaller) Available() bool { return true }
 func (customInstaller) Bootstrap(ctx context.Context, out chan<- Line) error { return nil }
 
 func (customInstaller) Install(ctx context.Context, t preset.Tool, out chan<- Line) error {
-	return runCmd(ctx, t.Name, installCmd(t), out)
+	cmd := installCmd(t)
+	if t.PinSHA256 != "" {
+		return runVerifiedCurl(ctx, t.Name, cmd, t.PinSHA256, out)
+	}
+	if t.Source == "curl" {
+		out <- Line{Tool: t.Name, Stream: "meta",
+			Text: "WARN: no PinSHA256 — installing without supply-chain verification"}
+	}
+	return runCmd(ctx, t.Name, cmd, out)
 }
 
 func (customInstaller) DryRun(t preset.Tool) string { return installCmd(t) }

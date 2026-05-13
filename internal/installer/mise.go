@@ -8,6 +8,7 @@ import (
 	"github.com/ptmaroct/lfg/internal/preset"
 )
 
+
 // miseInstaller handles Source="mise" — language version manager.
 // Bootstrap pulls mise via brew on Mac (if available) or the official
 // install script otherwise.
@@ -28,12 +29,22 @@ func (m miseInstaller) Bootstrap(ctx context.Context, out chan<- Line) error {
 		return nil
 	}
 	cmd := miseInstallScript
+	useBrew := false
 	if runtime.GOOS == "darwin" {
-		// Prefer brew on Mac when available — keeps mise upgrade story
-		// consistent with the rest of the brew-managed tools.
 		if _, err := exec.LookPath("brew"); err == nil {
 			cmd = "brew install mise"
+			useBrew = true
 		}
+	}
+	if !useBrew {
+		// Verify the mise.run install script against the pinned hash
+		// before piping into sh. Brew path is trusted to Homebrew's own
+		// signature verification.
+		if sha := preset.CurrentPins().Pins["barebones/mise"].SHA256; sha != "" {
+			return runVerifiedCurl(ctx, "mise", cmd, sha, out)
+		}
+		out <- Line{Tool: "mise", Stream: "meta",
+			Text: "WARN: no PinSHA256 for mise installer — running unverified"}
 	}
 	return runCmd(ctx, "mise", cmd, out)
 }
