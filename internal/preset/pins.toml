@@ -3,57 +3,57 @@
 # This file is maintained by .github/workflows/preset-bump.yml.
 # DO NOT edit by hand — the bumper regenerates the whole file.
 
-bumped_at = "2026-05-13T14:11:08Z"
+bumped_at = "2026-08-31T12:22:06Z"
 
 [pins."ai-harnesses/claude-code"]
-sha256  = "b315b46925a9bfb9422f2503dd5aa649f680832f4c076b22d87c39d578c3d830"
+sha256  = "3a68d3406cf674e17bed1733a4dcf37805e2e47d87417700007d7e1aa766a944"
 
 [pins."ai-harnesses/codex"]
-version = "0.128.0"
+version = "0.149.1"
 
 [pins."ai-harnesses/droid"]
-sha256  = "224a1a2e7b7a2c7d9cc3c443c866b589cf26c49a69b39f34ff3653124832f461"
+sha256  = "43c421c2a00eee949a4a12217012c248eb25b04241f78343823658ca46eb0f26"
 
 [pins."ai-harnesses/opencode"]
 sha256  = "fc3c1b2123f49b6df545a7622e5127d21cd794b15134fc3b66e1ca49f7fb297e"
 
 [pins."barebones/brew"]
-sha256  = "dfd5145fe2aa5956a600e35848765273f5798ce6def01bd08ecec088a1268d91"
+sha256  = "12479a24be3f5307eecac7cde670fad7118640f031229e964f544b1367b52a41"
 
 [pins."barebones/bun"]
-version = "1.3.13"
+version = "1.4.0"
 
 [pins."barebones/mise"]
-version = "2026.5.6"
-sha256  = "2ac97541052b681a139d12b4cf841e05474db8c9df05c45ecbb83fd1a105cc8b"
+version = "2026.8.15"
+sha256  = "cc7afa553ff39ed6fd8df7a43049b671bc6f1e8cff4b740e51ea907972293055"
 
 [pins."barebones/node-lts"]
-version = "24.15.0"
+version = "24.19.0"
 
 [pins."barebones/pnpm"]
-version = "11.0.6"
+version = "11.23.0"
 
 [pins."barebones/uv"]
-sha256  = "14b6b88d74b9300d906d9754118afb4d4151e78ad294f026047b7227f5611760"
+sha256  = "92e8554321e2bde08c9b1445dae47a65360f885274f31df51cdc2f9faa84e001"
 
 [pins."barebones/yarn"]
 version = "1.22.22"
 
 [pins."terminal-essentials/lazygit"]
-version = "0.61.1"
+version = "0.64.1"
 
 [pins."terminal-essentials/ripgrep"]
-version = "15.1.0"
+version = "15.2.0"
 
 [pins."terminal-essentials/tailscale"]
-version = "1.96.4"
+version = "1.102.3"
 
 [pins."terminal-essentials/tmux"]
-version = "3.6a"
+version = "3.7c"
 
 [pins."terminal-essentials/zoxide"]
-version = "0.9.9"
+version = "0.10.0"
 
 [pins."terminal-essentials/zsh"]
-version = "5.9"
+version = "5.9.2"
 
